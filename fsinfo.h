@@ -1,0 +1,37 @@
+#ifndef _FSINFO_H
+#define _FSINFO_H 1
+
+#include <linux/fs.h>
+#include <linux/mutex.h>
+#include <linux/vfs.h>
+
+/*
+ * Xv6 filesystem info struct are defined here.
+ */
+
+/*
+ * This struct is passed to super_block::s_fs_info
+ */
+struct xv6_fs_info;
+
+/*
+ * This struct is passed to fs_context::fs_private
+ */
+struct xv6_mount_options;
+
+struct xv6_fs_info {
+    struct mutex build_inode_lock;
+    uint size;         // Size of file system image (blocks)
+    uint nblocks;      // Number of data blocks
+    uint ninodes;      // Number of inodes.
+    uint nlog;         // Number of log blocks
+    uint logstart;     // Block number of first log block
+    uint inodestart;   // Block number of first inode block
+    uint bmapstart;    // Block number of first free map block
+    struct inode *root_dir;
+};
+
+
+struct xv6_mount_options {};
+
+#endif // _FSINFO 1

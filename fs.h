@@ -3,6 +3,11 @@
 #define _FS_H 1
 #include "common.h"
 
+// Copied from github.com/mit-pdos/xv6-riscv/kernel/stat.h
+#define T_DIR     1   // Directory
+#define T_FILE    2   // File
+#define T_DEVICE  3   // Device
+
 // On-disk file system format.
 // Both the kernel and user programs use this header file.
 

@@ -3,7 +3,7 @@ TARGET_MODULE := xv6fs
 
 # If we are running by kernel building system
 ifneq ($(KERNELRELEASE),)
-	$(TARGET_MODULE)-objs := init.o
+	$(TARGET_MODULE)-objs := init.o sector.o
 	obj-m := $(TARGET_MODULE).o
 
 # If we running without kernel build system
