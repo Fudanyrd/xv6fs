@@ -19,6 +19,11 @@ struct xv6_fs_info;
  */
 struct xv6_mount_options;
 
+struct xv6_mount_options {
+    kuid_t uid;
+    kgid_t gid;
+};
+
 struct xv6_fs_info {
     struct mutex build_inode_lock;
     uint size;         // Size of file system image (blocks)
@@ -29,9 +34,7 @@ struct xv6_fs_info {
     uint inodestart;   // Block number of first inode block
     uint bmapstart;    // Block number of first free map block
     struct inode *root_dir;
+    struct xv6_mount_options options;
 };
-
-
-struct xv6_mount_options {};
 
 #endif // _FSINFO 1
