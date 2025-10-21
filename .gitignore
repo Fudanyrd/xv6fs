@@ -1,0 +1,12 @@
+.vscode
+fat
+*.cmd
+*.swp
+*.o
+*.mod
+*.ko
+Module.symvers
+modules.order
+reference.c
+*.mod.c
+
