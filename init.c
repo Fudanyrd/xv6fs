@@ -15,6 +15,89 @@
 #include "fs.h"
 #include "fsinfo.h"
 
+/* locking routine */
+
+static inline struct mutex *xv6_get_lock(struct super_block *sb) {
+    struct xv6_fs_info *fi = (struct xv6_fs_info *) sb->s_fs_info;
+    return &(fi->build_inode_lock);
+}
+static inline void xv6_lock(struct super_block *sb) {
+    mutex_lock(xv6_get_lock(sb));
+}
+static inline void xv6_unlock(struct super_block *sb) {
+    mutex_unlock(xv6_get_lock(sb));
+}
+
+/*
+ * +-+ balloc.c: allocate/free blocks. 
+ * These methods does NOT hold the fs lock.  +-+
+ */
+/**
+ * Search the bitmap for an unused block.
+ * @returns 0 if disk full.
+ */
+static uint xv6_balloc(struct super_block *sb);
+/*
+ * Marks `block` as unused. `block` must be a data block.
+ */
+static void xv6_bfree(struct super_block *sb, uint block);
+
+/* +-+ inode.c: inode operations. +-+ */
+static const struct dentry_operations xv6_dentry_ops;
+static const struct inode_operations xv6_inode_ops;
+/** 
+ * It holds fs lock, allocate an inode, and creates the file.
+ */
+static int xv6_create(struct mnt_idmap *idmap, struct inode *dir,
+            struct dentry *dentry, umode_t mode, bool extc);
+/*
+ * It holds the lock, and look up dentry->name in directory.
+ */
+static struct dentry *xv6_lookup(struct inode *dir, struct dentry *dentry,
+			 unsigned int flags);
+/*
+ * Compute the hash for the xv6 name corresponding to the dentry.
+ * Note: if the name is invalid, we leave the hash code unchanged so
+ * that the existing dentry can be used. The xv6 fs routines will
+ * return ENOENT or EINVAL as appropriate.
+ */
+static int xv6_hash(const struct dentry *dentry, struct qstr *qstr);
+/*
+ * Compare two xv6 names. If either of the names are invalid,
+ * we fall back to doing the standard name comparison.
+ */
+static int xv6_cmp(const struct dentry *dentry,
+         unsigned int len, const char *str, const struct qstr *name);
+/**
+ * This function does not hold lock.
+ * @return the initialized inode structure; ERR_PTR(reason) on failure.
+ */
+static struct inode *xv6_iget(struct super_block *sb, uint inum);
+/* Returns 0 if ok; -ERR otherwise. */
+static int xv6_init_inode(struct inode *ino, const struct dinode *dino);
+
+/* +-+ dir.c: directory entry operations. These will NOT hold lock. +-+ */
+/**
+ * Find a directory entry, and set *inum to its inode number.
+ * If no error occurred in reading the dir, but entry is not found,
+ * this fill set `inum' to 0.
+ *
+ * @return 0 on success; `reason' on error.
+ */
+static int xv6_find_inum(struct inode *dir, struct dentry *entry, uint *inum);
+
+/* 
+ * +-+ file.c: file read/write operations. 
+ * (directory is organized much like a file) 
+ * +-+ 
+ */
+
+
+#include "balloc.c"
+#include "inode.c"
+#include "dir.c"
+#include "file.c"
+
 enum {
     XV6_UID = 1,
     XV6_GID = 2,
@@ -141,7 +224,7 @@ static int xv6_fill_super(struct super_block *sb, struct fs_context *fc) {
     fsinfo->nbmap_blocks = BITMAP_BLOCKS(fsinfo->size);
     uint start = 1 /* super block */;
     if (fsinfo->logstart != start) {
-        xv6_error("xv6: expected logstart = 1, got %u", fsinfo->logstart);
+        xv6_error("expected logstart = 1, got %u", fsinfo->logstart);
         goto out_fail;
     }
     start += fsinfo->nlog;
