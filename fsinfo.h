@@ -33,6 +33,8 @@ struct xv6_fs_info {
     uint logstart;     // Block number of first log block
     uint inodestart;   // Block number of first inode block
     uint bmapstart;    // Block number of first free map block
+    uint ninode_blocks; // Number of inode blocks
+    uint nbmap_blocks;  // Number of bitmap blocks
     struct inode *root_dir;
     struct xv6_mount_options options;
 };

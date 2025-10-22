@@ -51,11 +51,17 @@ struct dinode {
 // Inodes per block.
 #define IPB           (BSIZE / sizeof(struct dinode))
 
+// total number of inode blocks
+#define INODE_BLOCKS(inodes) ((inodes) / IPB + 1)
+
 // Block containing inode i
 #define IBLOCK(i, sb)     ((i) / IPB + sb.inodestart)
 
 // Bitmap bits per block
 #define BPB           (BSIZE*8)
+
+// Number of bitmap blocks
+#define BITMAP_BLOCKS(fssize) ((fssize) / BPB + 1)
 
 // Block of free map containing bit for block b
 #define BBLOCK(b, sb) ((b)/BPB + sb.bmapstart)

@@ -71,6 +71,8 @@ static int xv6fs_init_fs_ctx(struct fs_context *fc) {
 }
 
 static int __init xv6fs_init(void) {
+    xv6_assert((BSIZE % sizeof(struct dinode)) == 0);
+    xv6_assert((BSIZE % sizeof(struct dirent)) == 0);
     return register_filesystem(&xv6fs_type);
 }
 static void __exit xv6fs_exit(void) {
@@ -127,6 +129,46 @@ static int xv6_fill_super(struct super_block *sb, struct fs_context *fc) {
     fsinfo->bmapstart = __le32_to_cpu(xv6_sb->bmapstart);
     brelse(bh); bh = NULL;
 
+    struct dirent dummy;
+    const typeof(dummy.inum) ninodes_max = (typeof(dummy.inum)) (-1);
+    if (fsinfo->ninodes > ninodes_max) {
+        xv6_warn("Too many inodes (max %u supported)", ninodes_max);
+        fsinfo->ninodes = ninodes_max;
+        /* FIXME: also update super block on disk. */
+    }
+    error = -EINVAL;
+    fsinfo->ninode_blocks = INODE_BLOCKS(fsinfo->ninodes);
+    fsinfo->nbmap_blocks = BITMAP_BLOCKS(fsinfo->size);
+    uint start = 1 /* super block */;
+    if (fsinfo->logstart != start) {
+        xv6_error("xv6: expected logstart = 1, got %u", fsinfo->logstart);
+        goto out_fail;
+    }
+    start += fsinfo->nlog;
+    if (fsinfo->inodestart != start) {
+        xv6_error("expected inode start = %u, got %u", start, fsinfo->inodestart);
+        goto out_fail;
+    }
+    start += fsinfo->ninode_blocks;
+    if (fsinfo->bmapstart != start) {
+        xv6_error("expected bitmap start = %u, got %u", start, fsinfo->bmapstart);
+        goto out_fail;
+    }
+    start += fsinfo->nbmap_blocks;
+    start += fsinfo->nblocks;
+    if (fsinfo->size < start) {
+        xv6_error("Disk too small(%u) to hold %u blocks.", fsinfo->size, start);
+        goto out_fail;
+    } else if (fsinfo->size > start) {
+        /* Wasted some disk blocks. */
+        xv6_warn("Disk too large(%u) to hold %u blocks.", fsinfo->size, start);
+    }
+    /*
+     * FIXME: Now check the bitmap blocks. All metadata blocks(super, inode, bitmap)
+     * should be marked 1 in the bitmap, because they cannot be allocated for file 
+     * or directory. 
+     */
+
     /* Read root directory. */
     root_dir = new_inode(sb);
     error = -ENOMEM;
@@ -181,7 +223,7 @@ static int xv6_parse_param(struct fs_context *fc, struct fs_parameter *param) {
             options->uid = result.uid;
             break;
         case (XV6_GID):
-            options->uid = result.uid;
+            options->gid = result.gid;
             break;
         default: return -EINVAL;
     }
