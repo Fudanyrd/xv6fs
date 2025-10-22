@@ -9,4 +9,6 @@ Module.symvers
 modules.order
 reference.c
 *.mod.c
+*.img
+mkxv6
 

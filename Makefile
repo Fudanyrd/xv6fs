@@ -20,3 +20,6 @@ clean:
 	$(MAKE) -C $(BUILDSYSTEM_DIR) M=$(PWD) clean
 endif
 
+mkxv6: mkxv6.c Makefile
+	@echo CCLD mkxv6 && gcc -Wall -Werror -g -O2 -o mkxv6 mkxv6.c
+
