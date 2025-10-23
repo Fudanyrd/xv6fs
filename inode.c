@@ -99,7 +99,7 @@ static struct inode *xv6_iget(struct super_block *sb, uint inum) {
     disk_inode = (const struct dinode *) (bh->b_data);
     disk_inode += inum % IPB;
     inode->i_ino = inum;
-    error = xv6_init_inode(inode, disk_inode);
+    error = xv6_init_inode(inode, disk_inode, inum);
 
 iget_fini:
     brelse(bh);
@@ -110,12 +110,13 @@ iget_fini:
     return inode;
 }
 
-static int xv6_init_inode(struct inode *ino, const struct dinode *dino) {
+static int xv6_init_inode(struct inode *ino, const struct dinode *dino, uint inum) {
     struct super_block *sb = ino->i_sb;
     const struct xv6_fs_info *fsinfo = (const struct xv6_fs_info *) 
                 (sb->s_fs_info);
     xv6_assert(ino != NULL && fsinfo != NULL);
 
+    ino->i_ino = inum;
     ino->i_uid = fsinfo->options.uid;
     ino->i_gid = fsinfo->options.gid;
     ino->i_op = &xv6_inode_ops;
@@ -133,7 +134,7 @@ static int xv6_init_inode(struct inode *ino, const struct dinode *dino) {
         case T_DIR: isdir = true;
             break;
         case T_FILE:
-        case T_DEVICE:
+        case T_DEVICE: break;
         default: {
             xv6_error("inode %lu: Unsupported inode type %hu\n",  ino->i_ino, itype);
             return -EINVAL;
@@ -151,6 +152,8 @@ static int xv6_init_inode(struct inode *ino, const struct dinode *dino) {
     /* For simplicity, set them to 1970-01-01. */
     ino->i_atime_sec = ino->i_mtime_sec = ino->i_ctime_sec = 0;
     ino->i_atime_nsec = ino->i_mtime_nsec = ino->i_ctime_nsec = 0;
+    ino->i_mode = mode;
+    ino->i_size = __le32_to_cpu(dino->size);
 
     return 0;
 }

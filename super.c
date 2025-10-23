@@ -110,6 +110,7 @@ static int xv6_fill_super(struct super_block *sb, struct fs_context *fc) {
     if (!root_dir) {
         goto out_fail;
     }
+    root_dir->i_sb = sb;
     fsinfo->root_dir = NULL /* root_dir */;
     bh = sb_bread(sb, 1 /* Super block */ + fsinfo->nlog);
     if (bh == NULL) {
@@ -117,7 +118,7 @@ static int xv6_fill_super(struct super_block *sb, struct fs_context *fc) {
         goto out_fail;
     }
     const struct dinode *xv6_root_dinode = (struct dinode *) bh->b_data + ROOTINO;
-    if ((error = xv6_init_inode(root_dir, xv6_root_dinode)) != 0) {
+    if ((error = xv6_init_inode(root_dir, xv6_root_dinode, ROOTINO)) != 0) {
         goto out_fail;
     }
     if (__le16_to_cpu(xv6_root_dinode->type) != T_DIR) {
@@ -125,7 +126,6 @@ static int xv6_fill_super(struct super_block *sb, struct fs_context *fc) {
         goto out_fail;
     }
     brelse(bh); bh = NULL;
-    root_dir->i_sb = sb;
     sb->s_root = d_make_root(root_dir);
 	if (!sb->s_root) {
 		xv6_error("get root inode failed");
@@ -205,8 +205,20 @@ static void xv6_free_fc(struct fs_context *fc) {
     }
 }
 
+static void xv6_kill_block_super(struct super_block *sb) {
+    struct dentry *root = sb->s_root;
+    if (root) {
+        sb->s_root = NULL;
+        xv6_info ("freeing root 0x%lx", (unsigned long) root);
+        dput(root);
+    }
+    xv6_info ("Unmounting xv6fs");
+    kill_block_super(sb);
+}
+
 static const struct super_operations xv6_super_ops = {
     .alloc_inode = xv6_alloc_inode,
     .free_inode = xv6_free_inode,
+    .destroy_inode = xv6_free_inode,
     .show_options = xv6_show_options,
 };

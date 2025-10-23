@@ -55,7 +55,7 @@ static struct inode *xv6_alloc_inode(struct super_block *sb) {
     return kzalloc(sizeof(struct inode), GFP_KERNEL);
 }
 static void xv6_free_inode(struct inode *ino) {
-    kfree(ino);
+    // kfree(ino);
 }
 static int xv6_getattr(struct mnt_idmap *, const struct path *, struct kstat *, 
             u32, unsigned int);
@@ -88,7 +88,7 @@ static int xv6_cmp(const struct dentry *dentry,
  */
 static struct inode *xv6_iget(struct super_block *sb, uint inum);
 /* Returns 0 if ok; -ERR otherwise. */
-static int xv6_init_inode(struct inode *ino, const struct dinode *dino);
+static int xv6_init_inode(struct inode *ino, const struct dinode *dino, uint inum);
 
 /* +-+ dir.c: directory entry operations. These will NOT hold lock. +-+ */
 /**
@@ -149,6 +149,7 @@ static int xv6_get_tree(struct fs_context *fc);
 static int xv6_reconfigure(struct fs_context *fc);
 static void xv6_free_fc(struct fs_context *fc);
 static const struct super_operations xv6_super_ops;
+static void xv6_kill_block_super(struct super_block *sb);
 
 static const struct fs_context_operations xv6fs_context_ops = {
     .parse_param = xv6_parse_param,
@@ -161,7 +162,7 @@ static struct file_system_type xv6fs_type = {
     .owner = THIS_MODULE,
     .name = "xv6fs",
     .mount = NULL,
-    .kill_sb = kill_block_super,
+    .kill_sb = xv6_kill_block_super,
     .init_fs_context = xv6fs_init_fs_ctx,
 	.fs_flags	= FS_REQUIRES_DEV | FS_ALLOW_IDMAP,
     .parameters = xv6_param_spec,
