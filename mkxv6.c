@@ -47,7 +47,7 @@ static int (*printk)(const char *fmt, ...) = printf;
 #define NINODES 200
 
 // Disk layout:
-// [ boot block | sb block | log | inode blocks | free bit map | data blocks ]
+// [ sb block | log | inode blocks | free bit map | data blocks ]
 
 // int nbitmap = FSSIZE/BPB + 1;
 XV6_LOCAL(int) nbitmap = BITMAP_BLOCKS(FSSIZE);
@@ -122,7 +122,7 @@ main(int argc, char *argv[])
     die(argv[1]);
 
   // 1 fs block = 1 disk sector
-  nmeta = 2 + nlog + ninodeblocks + nbitmap;
+  nmeta = 1 + nlog + ninodeblocks + nbitmap;
   nblocks = FSSIZE - nmeta;
 
   sb.magic = FSMAGIC;
@@ -130,11 +130,11 @@ main(int argc, char *argv[])
   sb.nblocks = xint(nblocks);
   sb.ninodes = xint(NINODES);
   sb.nlog = xint(nlog);
-  sb.logstart = xint(2);
-  sb.inodestart = xint(2+nlog);
-  sb.bmapstart = xint(2+nlog+ninodeblocks);
+  sb.logstart = xint(1);
+  sb.inodestart = xint(1+nlog);
+  sb.bmapstart = xint(1+nlog+ninodeblocks);
 
-  printf("nmeta %d (boot, super, log blocks %u, inode blocks %u, bitmap blocks %u) blocks %d total %d\n",
+  printf("nmeta %d (super, log blocks %u, inode blocks %u, bitmap blocks %u) blocks %d total %d\n",
          nmeta, nlog, ninodeblocks, nbitmap, nblocks, FSSIZE);
 
   freeblock = nmeta;     // the first free block that we can allocate
@@ -144,7 +144,7 @@ main(int argc, char *argv[])
 
   memset(buf, 0, sizeof(buf));
   memmove(buf, &sb, sizeof(sb));
-  wsect(1, buf);
+  wsect(0, buf);
 
   rootino = ialloc(T_DIR);
   assert(rootino == ROOTINO);
