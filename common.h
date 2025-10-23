@@ -1,14 +1,17 @@
 #ifndef _COMMON_H
 #define _COMMON_H 1
 
+#define xv6_min(a, b) ( (a) > (b) ? (b) : (a) )
+
 typedef unsigned int uint;
 typedef unsigned short ushort;
 typedef unsigned char uchar;
 
-#define xv6_assert(cond) do {                                         \
-    if (! (cond)) {                                                   \
-        panic("xv6: internal error at %s:%d\n", __FILE__, __LINE__);  \
-    }                                                                 \
+#define xv6_assert(cond) do {                                                \
+    if (! (cond)) {                                                          \
+        panic("xv6: internal error at %s:%d\nxv6: Assertion `%s\' failed.\n",\
+             __FILE__, __LINE__, #cond);                                     \
+    }                                                                        \
 } while (0)
 
 #define xv6_static_assert(cond) \

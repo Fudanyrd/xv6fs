@@ -37,6 +37,7 @@ struct xv6_fs_info {
     uint nbmap_blocks;  // Number of bitmap blocks
     struct inode *root_dir;
     struct xv6_mount_options options;
+    u64 balloc_hint; /* block allocation hint */
 };
 
 #endif // _FSINFO 1

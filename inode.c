@@ -42,13 +42,19 @@ static int xv6_cmp(const struct dentry *dentry,
     return ret;
 }
 
+static int xv6_create(struct mnt_idmap *idmap, struct inode *dir,
+            struct dentry *dentry, umode_t mode, bool extc) {
+    /* FIXME: not implemented. */
+    return -EINVAL;
+}
+
 static struct dentry *xv6_lookup(struct inode *dir, struct dentry *dentry,
 			 unsigned int flags) {
     struct super_block *sb = dir->i_sb;
     xv6_lock(sb);
 	struct inode *inode = NULL;
 
-    uint inum;
+    uint inum = 0;
     int reason = xv6_find_inum(dir, dentry, &inum);
     if (!inum) {
         /* Not found */
@@ -121,6 +127,7 @@ static int xv6_init_inode(struct inode *ino, const struct dinode *dino) {
     bool isdir = false;
     switch (itype) {
         case T_DIR: isdir = true;
+            break;
         case T_FILE:
         case T_DEVICE:
         default: {
