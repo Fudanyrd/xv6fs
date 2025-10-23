@@ -12,6 +12,7 @@ static inline int xv6_bzero(struct super_block *sb, uint block) {
     
     struct buffer_head *bh = sb_bread(sb, block);
     if (!bh) {
+        xv6_error("unable to read block %u for zeroing", block);
         return -EIO;
     }
     memset(bh->b_data, 0, BSIZE);
@@ -122,14 +123,14 @@ try_balloc:
     
         if ((mask & bitarray[index]) == 0) {
             if ((error = xv6_bzero(sb, alloc)) != 0) {
-                brelse(bh);
+                /* Do not try to allocate. */
                 fsinfo->balloc_hint = alloc;
             } else {
-            bitarray[index] |= mask;
-            mark_buffer_dirty(bh);
-            error = sync_dirty_buffer(bh);
-            *block = alloc;
-            fsinfo->balloc_hint = alloc + 1;
+                bitarray[index] |= mask;
+                mark_buffer_dirty(bh);
+                error = sync_dirty_buffer(bh);
+                *block = alloc;
+                fsinfo->balloc_hint = alloc + 1;
             }
             succ = true;
             break;
