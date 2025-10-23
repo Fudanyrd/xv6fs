@@ -39,6 +39,9 @@ static inline void xv6_unlock(struct super_block *sb) {
  * @returns -ERR if error occurred.
  */
 static int xv6_balloc(struct super_block *sb, uint *block);
+/* call xv6_balloc, and initialize the block to zero. */
+static int (*xv6_balloc_zero)(struct super_block *sb, uint *block) 
+            = xv6_balloc;
 /**
  * Marks `block` as unused. `block` must be a data block.
  * @returns -ERR if error occurred.
@@ -95,6 +98,25 @@ static int xv6_find_inum(struct inode *dir, struct dentry *entry, uint *inum);
  * +-+ 
  */
 static const struct file_operations xv6_file_ops;
+/**
+ * Sets bhptr to the i'th block of file data. If reaches end,
+ * return 0 and set bhptr to NULL.
+ */
+static int xv6_file_block(struct super_block *sb, const struct dinode *file,
+            uint i, struct buffer_head **bhptr);
+/**
+ * Get the i'th block of file data. If reaches end, allocate 
+ * and attach a block; else it's the same as `xv6_file_block`.
+ *
+ * If disk is full and cannot allocate, returns -ENOSPC, and
+ * bhptr is undefined.
+ *
+ * @param[out] dirty set this bit to whether dinode is modified.
+ * @param[out] bhptr the data block
+ * @throw -EROFS if filesystem is read-only.
+ */
+static int xv6_file_alloc(struct super_block *sb, struct dinode *file,
+            uint i, bool *dirty, struct buffer_head **bhptr);
 
 /* +-+ super.c super block operations. +-+ */
 enum {

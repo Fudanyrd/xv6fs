@@ -5,7 +5,27 @@
 static int xv6_balloc_rng(struct super_block *sb, uint *block, uint start, 
              uint end);
 
+static inline int xv6_bzero(struct super_block *sb, uint block) {
+    if (sb->s_flags & SB_RDONLY) {
+        return -EROFS;
+    }
+    
+    struct buffer_head *bh = sb_bread(sb, block);
+    if (!bh) {
+        return -EIO;
+    }
+    memset(bh->b_data, 0, BSIZE);
+    mark_buffer_dirty(bh);
+    int error = sync_dirty_buffer(bh);
+    brelse(bh);
+
+    return error;
+}
+
 static int xv6_bfree(struct super_block *sb, uint block) {
+    if (sb->s_flags & SB_RDONLY) {
+        return -EROFS;
+    }
     struct xv6_fs_info *fsinfo = sb->s_fs_info;
     xv6_assert(block < fsinfo->size && "attempting out-of-bound access");
     xv6_assert(block >= fsinfo->bmapstart + BITMAP_BLOCKS(fsinfo->size) 
@@ -38,6 +58,9 @@ static int xv6_bfree(struct super_block *sb, uint block) {
 }
 
 static int xv6_balloc(struct super_block *sb, uint *block) {
+    if (sb->s_flags & SB_RDONLY) {
+        return -EROFS;
+    }
     *block = 0;
     struct xv6_fs_info *fsinfo = sb->s_fs_info;
     const uint data_start = fsinfo->bmapstart + BITMAP_BLOCKS(fsinfo->size);
@@ -98,11 +121,16 @@ try_balloc:
         mask = (1u << mask);
     
         if ((mask & bitarray[index]) == 0) {
+            if ((error = xv6_bzero(sb, alloc)) != 0) {
+                brelse(bh);
+                fsinfo->balloc_hint = alloc;
+            } else {
             bitarray[index] |= mask;
             mark_buffer_dirty(bh);
             error = sync_dirty_buffer(bh);
             *block = alloc;
             fsinfo->balloc_hint = alloc + 1;
+            }
             succ = true;
             break;
         }             

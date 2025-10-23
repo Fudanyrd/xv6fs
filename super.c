@@ -145,7 +145,14 @@ static int xv6_get_tree(struct fs_context *fc) {
 }
 
 static int xv6_reconfigure(struct fs_context *fc) {
-    sync_filesystem(fc->root->d_sb);
+	struct super_block *sb = fc->root->d_sb;
+    bool new_readonly = fc->sb_flags & SB_RDONLY;
+    if (new_readonly) {
+        sb->s_flags |= SB_RDONLY;
+    } else {
+        sb->s_flags &= ~SB_RDONLY;
+    }
+    sync_filesystem(sb);
     return 0;
 }
 
