@@ -37,8 +37,9 @@ static int xv6_fill_super(struct super_block *sb, struct fs_context *fc) {
 	sb->s_time_gran = 1;
     sb->s_time_min = 0;
     sb->s_time_max = (time64_t) (9223372036854775807L);
+    sb->s_root = NULL;
 
-	set_default_d_op(sb, NULL /* FIXME */);
+	set_default_d_op(sb, &xv6_dentry_ops);
     bh = sb_bread(sb, 0);
     if (bh == NULL) {
         /* Unable to read super block. */
@@ -109,7 +110,7 @@ static int xv6_fill_super(struct super_block *sb, struct fs_context *fc) {
     if (!root_dir) {
         goto out_fail;
     }
-    fsinfo->root_dir = root_dir;
+    fsinfo->root_dir = NULL /* root_dir */;
     bh = sb_bread(sb, 1 /* Super block */ + fsinfo->nlog);
     if (bh == NULL) {
         error = -EIO;
@@ -124,10 +125,20 @@ static int xv6_fill_super(struct super_block *sb, struct fs_context *fc) {
         goto out_fail;
     }
     brelse(bh); bh = NULL;
+    root_dir->i_sb = sb;
+    sb->s_root = d_make_root(root_dir);
+	if (!sb->s_root) {
+		xv6_error("get root inode failed");
+		goto out_fail;
+	}
+    xv6_info("got root dentry 0x%lx", (unsigned long) sb->s_root);
 
 	/* Apply parsed options to sbi (structure copy) */
     /* Finished without error. */
 	fsinfo->options = *(const struct xv6_mount_options *)(fc->fs_private);
+    xv6_info("Mounted xv6fs with uid=%u, gid=%u",
+        from_kuid_munged(&init_user_ns, fsinfo->options.uid),
+        from_kgid_munged(&init_user_ns, fsinfo->options.gid));
     return 0;
 out_fail:
     kfree(fsinfo);
@@ -195,5 +206,7 @@ static void xv6_free_fc(struct fs_context *fc) {
 }
 
 static const struct super_operations xv6_super_ops = {
+    .alloc_inode = xv6_alloc_inode,
+    .free_inode = xv6_free_inode,
     .show_options = xv6_show_options,
 };

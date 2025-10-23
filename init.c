@@ -51,6 +51,14 @@ static int xv6_bfree(struct super_block *sb, uint block);
 /* +-+ inode.c: inode operations. +-+ */
 static const struct dentry_operations xv6_dentry_ops;
 static const struct inode_operations xv6_inode_ops;
+static struct inode *xv6_alloc_inode(struct super_block *sb) {
+    return kzalloc(sizeof(struct inode), GFP_KERNEL);
+}
+static void xv6_free_inode(struct inode *ino) {
+    kfree(ino);
+}
+static int xv6_getattr(struct mnt_idmap *, const struct path *, struct kstat *, 
+            u32, unsigned int);
 /** 
  * It holds fs lock, allocate an inode, and creates the file.
  */
@@ -117,6 +125,11 @@ static int xv6_file_block(struct super_block *sb, const struct dinode *file,
  */
 static int xv6_file_alloc(struct super_block *sb, struct dinode *file,
             uint i, bool *dirty, struct buffer_head **bhptr);
+#define xv6_lseek  generic_file_llseek
+#define xv6_file_read_iter generic_file_read_iter
+static int xv6_update_time(struct inode *a1, int a2) {
+    return 0;
+}
 
 /* +-+ super.c super block operations. +-+ */
 enum {

@@ -25,5 +25,9 @@ typedef unsigned char uchar;
     printk(KERN_ERR "xv6: " fmt "\n", ##__VA_ARGS__);     \
 } while (0)
 
+#define xv6_info(fmt, ...) do {                            \
+    printk(KERN_INFO "xv6: " fmt "\n", ##__VA_ARGS__);     \
+} while (0)
+
 #endif // _COMMON_H 1
 

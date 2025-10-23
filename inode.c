@@ -118,10 +118,14 @@ static int xv6_init_inode(struct inode *ino, const struct dinode *dino) {
 
     ino->i_uid = fsinfo->options.uid;
     ino->i_gid = fsinfo->options.gid;
+    ino->i_op = &xv6_inode_ops;
 	inode_inc_iversion(ino);
 	ino->i_generation = get_random_u32();
     set_nlink(ino, __le16_to_cpu(dino->nlink));
     typeof(ino->i_mode) mode = S_IRWXU | S_IRWXG | S_IRWXO;
+    if (sb->s_flags & SB_RDONLY) {
+        mode &= ~(S_IWUSR | S_IWGRP | S_IWOTH);
+    }
 
     ushort itype = __le16_to_cpu((ushort) dino->type);
     bool isdir = false;
@@ -138,12 +142,10 @@ static int xv6_init_inode(struct inode *ino, const struct dinode *dino) {
 
     if (isdir) {
         mode |= S_IFDIR;
-        ino->i_op = &xv6_inode_ops;
 		ino->i_generation &= ~1;
     } else {
 		ino->i_generation |= 1;
         mode |= S_IFREG;
-        ino->i_fop = NULL /* FIXME: &xv6_file_operations; */;
     }
 
     /* For simplicity, set them to 1970-01-01. */
@@ -156,10 +158,21 @@ static int xv6_init_inode(struct inode *ino, const struct dinode *dino) {
 static int xv6_create(struct mnt_idmap *idmap, struct inode *dir,
             struct dentry *dentry, umode_t mode, bool extc);
 
+static int xv6_getattr(struct mnt_idmap *idmap, const struct path *path,
+		      struct kstat *stat, u32 request_mask, unsigned int flags) {
+	struct inode *inode = d_inode(path->dentry);
+	generic_fillattr(idmap, request_mask, inode, stat);
+	stat->blksize = BSIZE;
+    stat->ino = inode->i_ino;
+    return 0;
+}
 /* xv6's inode operation struct. '*/
 static const struct inode_operations xv6_inode_ops = {
     .lookup = xv6_lookup,
     .create = xv6_create,
+    .update_time = xv6_update_time,
+    .permission = NULL,
+    .getattr = xv6_getattr,
 };
 
 /* comparison */
