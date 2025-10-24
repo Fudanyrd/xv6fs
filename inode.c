@@ -219,7 +219,7 @@ static void xv6_evict_inode(struct inode *ino) {
    /*
     * https://elixir.bootlin.com/linux/v6.17.4/source/fs/autofs/inode.c#L105
     */
-    xv6_debug("evicting inode %lu\n", ino->i_ino);
+    xv6_debug("evicting inode %lu", ino->i_ino);
     clear_inode(ino);
     kfree(ino->i_private);
     ino->i_private = NULL;

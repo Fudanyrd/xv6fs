@@ -207,12 +207,8 @@ static void xv6_free_fc(struct fs_context *fc) {
 }
 
 static void xv6_kill_block_super(struct super_block *sb) {
-    struct dentry *root = sb->s_root;
-    if (root) {
-        sb->s_root = NULL;
-        xv6_debug ("freeing root 0x%lx", (unsigned long) root);
-        dput(root);
-    }
+    /* 😭 Should not dput sb->s_root here. */
+    /* Read the implementation of kill_block_super :) */
     xv6_info ("Unmounting xv6fs");
     kill_block_super(sb);
 }
@@ -224,5 +220,5 @@ static const struct super_operations xv6_super_ops = {
     .show_options = xv6_show_options,
     .write_inode = xv6_write_inode,
     .evict_inode = xv6_evict_inode,
-    .put_super = xv6_put_super,
+    .put_super = NULL,
 };

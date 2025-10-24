@@ -191,9 +191,6 @@ static int xv6_reconfigure(struct fs_context *fc);
 static void xv6_free_fc(struct fs_context *fc);
 static const struct super_operations xv6_super_ops;
 static void xv6_kill_block_super(struct super_block *sb);
-static void xv6_put_super(struct super_block *sb) {
-    xv6_kill_block_super(sb);
-}
 
 static const struct fs_context_operations xv6fs_context_ops = {
     .parse_param = xv6_parse_param,
