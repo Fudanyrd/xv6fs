@@ -218,8 +218,8 @@ static void xv6_kill_block_super(struct super_block *sb) {
 }
 
 static const struct super_operations xv6_super_ops = {
-    .alloc_inode = xv6_alloc_inode,
-    .free_inode = xv6_free_inode,
-    .destroy_inode = xv6_free_inode,
+    .alloc_inode = NULL,
+    .free_inode = NULL,
+    .destroy_inode = NULL,
     .show_options = xv6_show_options,
 };

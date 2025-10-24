@@ -156,6 +156,7 @@ static int xv6_init_inode(struct inode *ino, const struct dinode *dino, uint inu
     ino->i_atime_nsec = ino->i_mtime_nsec = ino->i_ctime_nsec = 0;
     ino->i_mode = mode;
     ino->i_size = __le32_to_cpu(dino->size);
+    ino->i_private = NULL;
 
     return 0;
 }

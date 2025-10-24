@@ -51,12 +51,6 @@ static int xv6_bfree(struct super_block *sb, uint block);
 /* +-+ inode.c: inode operations. +-+ */
 static const struct dentry_operations xv6_dentry_ops;
 static const struct inode_operations xv6_inode_ops;
-static struct inode *xv6_alloc_inode(struct super_block *sb) {
-    return kzalloc(sizeof(struct inode), GFP_KERNEL);
-}
-static void xv6_free_inode(struct inode *ino) {
-    // kfree(ino);
-}
 static int xv6_getattr(struct mnt_idmap *, const struct path *, struct kstat *, 
             u32, unsigned int);
 /** 
