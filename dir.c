@@ -26,22 +26,18 @@ static inline int xv6_dget(struct inode *dir, struct dinode *dino) {
 }
 
 static int xv6_find_inum(struct inode *dir, struct dentry *entry, uint *inum) {
-    struct dinode dino;
-    int error = xv6_dget(dir, &dino);
-    if (error) {
-        return error;
-    }
-    short type = __le16_to_cpu(dino.type);
-    if (type != T_DIR) {
+    if ((dir->i_mode & S_IFMT) != S_IFDIR) {
+        /* Not a directory. */
         return -ENOTDIR;
     }
 
-    uint size = __le32_to_cpu(dino.size);
+    uint size = dir->i_size;
+    int error;
     xv6_assert(size % sizeof(struct dirent) == 0 && "corrupted directory size");
     *inum = 0;
     struct buffer_head *bh = NULL;
     uint block = 0;
-    while ((error = xv6_file_block(dir->i_sb, &dino, block, &bh)) == 0) {
+    while ((error = xv6_inode_block(dir, block, &bh)) == 0) {
         if (bh == NULL) {
             break; /* end of file */
         }
@@ -67,19 +63,15 @@ static int xv6_readdir(struct file *dir, struct dir_context *ctx) {
     uint cpos = ctx->pos;
     struct inode *inode = dir->f_inode;
     struct super_block *sb = inode->i_sb;
-    struct dinode dino;
+    int error;
     xv6_lock(sb);
-    int error = xv6_dget(inode, &dino);
-    if (error) {
-        goto readdir_fini;
-    }
-    short type = __le16_to_cpu(dino.type);
-    if (type != T_DIR) {
+    
+    if ((inode->i_mode & S_IFMT) != S_IFDIR) {
         error = -ENOTDIR;
         goto readdir_fini;
     }
 
-    uint size = __le32_to_cpu(dino.size);
+    uint size = inode->i_size;
     xv6_assert(size % sizeof(struct dirent) == 0 && "corrupted directory size");
     size /= sizeof(struct dirent);
 
@@ -88,7 +80,7 @@ static int xv6_readdir(struct file *dir, struct dir_context *ctx) {
     const int nents = BSIZE / sizeof(struct dirent);
 
     struct buffer_head *bh = NULL;
-    while ((error = xv6_file_block(inode->i_sb, &dino, block, &bh)) == 0) {
+    while ((error = xv6_inode_block(inode, block, &bh)) == 0) {
         if (bh == NULL) {
             break;
         }

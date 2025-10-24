@@ -223,6 +223,64 @@ static void xv6_evict_inode(struct inode *ino) {
     ino->i_private = NULL;
 }
 
+static int xv6_inode_block(struct inode *ino, uint i,
+            struct buffer_head **bhptr) {
+    struct super_block *sb = ino->i_sb;
+    uint *addrs;
+    struct dinode dino;
+    int error;
+    if (i >= MAXFILE) {
+        goto file_end;
+    }
+
+    /* Set `addrs` to start of indexing array.  */
+    if (ino->i_private == NULL) {
+        /* warn potential ENOMEM */
+        error = xv6_dget(ino, &dino);
+        if (error) { return error; }
+        for (int i = 0; i < NDIRECT + 1; i++) {
+            dino.addrs[i] = __le32_to_cpu(dino.addrs[i]);
+        }
+        addrs = dino.addrs;
+    } else {
+        addrs = ((struct xv6_inode_info *) ino->i_private)->addrs;
+    }
+
+    *bhptr = NULL;
+    struct buffer_head *bh;
+    struct buffer_head *indirect = NULL;
+    if (i < NDIRECT) {
+        uint block = addrs[i];
+        if (block == 0) { goto file_end; }
+        bh = sb_bread(sb, block);
+        *bhptr = bh;
+        return bh ? 0 : -EIO;
+        /* FIXME: check block later */
+    }
+
+    i -= NDIRECT;   
+    uint indirect_block = (addrs[NDIRECT]);
+    if (indirect_block == 0) { goto file_end; }
+
+    indirect = sb_bread(sb, indirect_block);
+    if (indirect == NULL) { 
+        return -EIO;
+    }
+    const uint *iaddrs = (const uint *) indirect->b_data;
+    uint data_block = __le32_to_cpu(iaddrs[i]);
+    brelse(indirect);
+    if (data_block == 0) {
+        goto file_end;
+    }
+
+    bh = sb_bread(sb, data_block);
+    *bhptr = bh;
+    return bh ? 0 : -EIO;
+file_end:
+    *bhptr = 0;
+    return 0;
+}
+
 /* xv6's inode operation struct. '*/
 static const struct inode_operations xv6_inode_ops = {
     .lookup = xv6_lookup,

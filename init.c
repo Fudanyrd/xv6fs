@@ -96,6 +96,11 @@ static int xv6_write_inode(struct inode *ino, struct writeback_control *wbc) {
     return ret; 
 }
 static void xv6_evict_inode(struct inode *ino);
+/*
+ * Use the cached addresses in ino->i_private to accelerate `xv6_file_block`.
+ */
+static int xv6_inode_block(struct inode *ino, uint i,
+            struct buffer_head **bhptr);
 
 /* +-+ dir.c: directory entry operations. These will NOT hold lock. +-+ */
 /* Use dir->i_ino to load an on-disk inode. */
@@ -123,7 +128,10 @@ static const struct file_operations xv6_directory_ops;
 /**
  * Sets bhptr to the i'th block of file data. If reaches end,
  * return 0 and set bhptr to NULL.
+ *
+ * This is deprecated and may be removed in the future.
  */
+__attribute__((unused))
 static int xv6_file_block(struct super_block *sb, const struct dinode *file,
             uint i, struct buffer_head **bhptr);
 /**

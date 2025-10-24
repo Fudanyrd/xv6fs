@@ -19,6 +19,7 @@ static const struct file_operations xv6_directory_ops = {
     .iterate_shared = xv6_readdir,
 };
 
+__attribute__((unused))
 static int xv6_file_block(struct super_block *sb, const struct dinode *file,
             uint i, struct buffer_head **bhptr) {
     *bhptr = NULL;
@@ -47,17 +48,20 @@ static int xv6_file_block(struct super_block *sb, const struct dinode *file,
     const uint *addrs = (const uint *) indirect->b_data;
     uint data_block = __le32_to_cpu(addrs[i]);
     brelse(indirect);
+    if (data_block == 0) {
+        goto file_end;
+    }
     bh = sb_bread(sb, data_block);
     *bhptr = bh;
     return bh ? 0 : -EIO;
 file_end:
+    *bhptr = 0;
     return 0;
 }
 
 static ssize_t xv6_file_read(struct file *file, char __user *buf,
             size_t len, loff_t *ppos) {
     struct inode *ino = file->f_inode;
-    struct dinode dino;
     struct super_block *sb = ino->i_sb;
     ssize_t nread = 0;
     loff_t cpos = *ppos;
@@ -71,13 +75,9 @@ static ssize_t xv6_file_read(struct file *file, char __user *buf,
         len = rest;
     }
 
-    if ((nread = xv6_dget(ino, &dino)) < 0) {
-        goto read_fini;
-    }
-
     struct buffer_head *bh = NULL;
     while (len) {
-        int error = xv6_file_block(sb, &dino, block, &bh);
+        int error = xv6_inode_block(ino, block, &bh);
         if (error) {
             nread = error;
             break;
@@ -113,7 +113,6 @@ static ssize_t xv6_file_read(struct file *file, char __user *buf,
         block += 1;
     }
 
-read_fini:
     xv6_unlock(sb);
     *ppos = cpos;
     return nread;
