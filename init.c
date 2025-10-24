@@ -168,6 +168,9 @@ static int xv6_file_clear(struct file *file);
 static int xv6_file_sync(struct file *file, loff_t start, loff_t end, int arg4) {
     return xv6_write_inode(file->f_inode, NULL);
 }
+static int xv6_file_flush(struct file *file, fl_owner_t id) {
+    return xv6_write_inode(file->f_inode, NULL);
+}
 
 /* +-+ super.c super block operations. +-+ */
 enum {
@@ -188,6 +191,9 @@ static int xv6_reconfigure(struct fs_context *fc);
 static void xv6_free_fc(struct fs_context *fc);
 static const struct super_operations xv6_super_ops;
 static void xv6_kill_block_super(struct super_block *sb);
+static void xv6_put_super(struct super_block *sb) {
+    xv6_kill_block_super(sb);
+}
 
 static const struct fs_context_operations xv6fs_context_ops = {
     .parse_param = xv6_parse_param,

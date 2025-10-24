@@ -224,4 +224,5 @@ static const struct super_operations xv6_super_ops = {
     .show_options = xv6_show_options,
     .write_inode = xv6_write_inode,
     .evict_inode = xv6_evict_inode,
+    .put_super = xv6_put_super,
 };

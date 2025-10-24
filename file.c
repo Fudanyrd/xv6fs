@@ -13,6 +13,7 @@ static const struct file_operations xv6_file_ops = {
     .write_iter = generic_file_write_iter,
     .iterate_shared = NULL,
     .fsync = xv6_file_sync,
+    .flush = xv6_file_flush,
 };
 
 static const struct file_operations xv6_directory_ops = {
@@ -21,6 +22,7 @@ static const struct file_operations xv6_directory_ops = {
     .read_iter = xv6_file_read_iter,
     .iterate_shared = xv6_readdir,
     .fsync = xv6_file_sync,
+    .flush = xv6_file_flush,
 };
 
 __attribute__((unused))
@@ -143,8 +145,6 @@ static ssize_t xv6_file_write(struct file *file, const char __user *buf,
     uint boff = cpos % BSIZE;
     struct buffer_head *bh = NULL;
     int error = 0;
-
-    xv6_debug("attempting write %lu bytes, offset %ld in inode %u", len, cpos, ino->i_ino);
 
     xv6_lock(sb);
     while (len) {
