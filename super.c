@@ -54,6 +54,7 @@ static int xv6_fill_super(struct super_block *sb, struct fs_context *fc) {
             __le32_to_cpu(xv6_sb->magic));
         goto out_fail;
     }
+    mutex_init(&fsinfo->build_inode_lock);
     fsinfo->size = __le32_to_cpu(xv6_sb->size);
     fsinfo->nblocks = __le32_to_cpu(xv6_sb->nblocks);
     fsinfo->ninodes = __le32_to_cpu(xv6_sb->ninodes);
