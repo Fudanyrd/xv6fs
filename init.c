@@ -165,6 +165,9 @@ static ssize_t xv6_file_write(struct file *file, const char __user *buf,
             size_t len, loff_t *ppos);
 /* Free all data blocks and indirect block of file. */
 static int xv6_file_clear(struct file *file);
+static int xv6_file_sync(struct file *file, loff_t start, loff_t end, int arg4) {
+    return xv6_write_inode(file->f_inode, NULL);
+}
 
 /* +-+ super.c super block operations. +-+ */
 enum {

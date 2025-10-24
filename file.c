@@ -12,6 +12,7 @@ static const struct file_operations xv6_file_ops = {
     .read_iter = xv6_file_read_iter,
     .write_iter = generic_file_write_iter,
     .iterate_shared = NULL,
+    .fsync = xv6_file_sync,
 };
 
 static const struct file_operations xv6_directory_ops = {
@@ -19,6 +20,7 @@ static const struct file_operations xv6_directory_ops = {
     .llseek = xv6_lseek,
     .read_iter = xv6_file_read_iter,
     .iterate_shared = xv6_readdir,
+    .fsync = xv6_file_sync,
 };
 
 __attribute__((unused))

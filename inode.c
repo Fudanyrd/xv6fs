@@ -366,7 +366,7 @@ wblock_clean:
             error = xv6_sync_inode(ino);
             ino->i_private = NULL;
         } else {
-            xv6_sync_inode(ino);
+            /* rely on fsync write this inode to disk. */
         }
     }
     return error;
