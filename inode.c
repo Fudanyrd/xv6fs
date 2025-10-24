@@ -165,6 +165,7 @@ static int xv6_init_inode(struct inode *ino, const struct dinode *dino, uint inu
         addrs[i] = __le32_to_cpu(dino->addrs[i]);
     }
     ino->i_private = i_info;
+    insert_inode_hash(ino);
 
     return 0;
 }
