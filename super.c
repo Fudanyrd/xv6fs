@@ -132,7 +132,7 @@ static int xv6_fill_super(struct super_block *sb, struct fs_context *fc) {
 		xv6_error("get root inode failed");
 		goto out_fail;
 	}
-    xv6_info("got root dentry 0x%lx", (unsigned long) sb->s_root);
+    xv6_debug("got root dentry 0x%lx", (unsigned long) sb->s_root);
 
 	/* Apply parsed options to sbi (structure copy) */
     /* Finished without error. */
@@ -210,7 +210,7 @@ static void xv6_kill_block_super(struct super_block *sb) {
     struct dentry *root = sb->s_root;
     if (root) {
         sb->s_root = NULL;
-        xv6_info ("freeing root 0x%lx", (unsigned long) root);
+        xv6_debug ("freeing root 0x%lx", (unsigned long) root);
         dput(root);
     }
     xv6_info ("Unmounting xv6fs");

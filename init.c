@@ -101,7 +101,14 @@ static void xv6_evict_inode(struct inode *ino);
  */
 static int xv6_inode_block(struct inode *ino, uint i,
             struct buffer_head **bhptr);
-
+/*
+ * Get a block for writing. If a block does not exist, will try to allocate one.
+ * If disk full, it returns -ENOSPC, and *bhptr is undefined.
+ *
+ * If inode is modified, it will properly mark it as dirty.
+ */
+static int xv6_inode_wblock(struct inode *ino, uint i,
+            struct buffer_head **bhptr);
 /* +-+ dir.c: directory entry operations. These will NOT hold lock. +-+ */
 /* Use dir->i_ino to load an on-disk inode. */
 static inline int xv6_dget(struct inode *dir, struct dinode *dino);
@@ -154,6 +161,10 @@ static int xv6_update_time(struct inode *a1, int a2) {
 }
 static ssize_t xv6_file_read(struct file *file, char __user *buf,
             size_t len, loff_t *ppos);
+static ssize_t xv6_file_write(struct file *file, const char __user *buf,
+            size_t len, loff_t *ppos);
+/* Free all data blocks and indirect block of file. */
+static int xv6_file_clear(struct file *file);
 
 /* +-+ super.c super block operations. +-+ */
 enum {

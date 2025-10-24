@@ -7,8 +7,10 @@
 static const struct file_operations xv6_file_ops = {
     .owner = THIS_MODULE,
     .read = xv6_file_read,
+    .write = xv6_file_write,
     .llseek = xv6_lseek,
     .read_iter = xv6_file_read_iter,
+    .write_iter = generic_file_write_iter,
     .iterate_shared = NULL,
 };
 
@@ -67,6 +69,7 @@ static ssize_t xv6_file_read(struct file *file, char __user *buf,
     loff_t cpos = *ppos;
     uint block = cpos / BSIZE;
     uint boff = cpos % BSIZE;
+    int error = 0;
 
     xv6_lock(sb);
     size_t file_size = ino->i_size;
@@ -77,9 +80,8 @@ static ssize_t xv6_file_read(struct file *file, char __user *buf,
 
     struct buffer_head *bh = NULL;
     while (len) {
-        int error = xv6_inode_block(ino, block, &bh);
+        error = xv6_inode_block(ino, block, &bh);
         if (error) {
-            nread = error;
             break;
         }
         size_t to_read = BSIZE - boff;
@@ -102,7 +104,7 @@ static ssize_t xv6_file_read(struct file *file, char __user *buf,
             bh = NULL;
         }
         if (page_fault) {
-            nread = -EFAULT;
+            error = -EFAULT;
             break;
         }
         buf += to_read;
@@ -114,6 +116,60 @@ static ssize_t xv6_file_read(struct file *file, char __user *buf,
     }
 
     xv6_unlock(sb);
+    if (error && nread <= 0) {
+        nread = error;
+    }
     *ppos = cpos;
     return nread;
 }
+
+static ssize_t xv6_file_write(struct file *file, const char __user *buf,
+            size_t len, loff_t *ppos) {
+    struct inode *ino = file->f_inode;
+    struct super_block *sb = ino->i_sb;
+    ssize_t nwrite = 0;
+    loff_t cpos = *ppos;
+    uint block = cpos / BSIZE;
+    uint boff = cpos % BSIZE;
+    struct buffer_head *bh = NULL;
+    int error = 0;
+
+    xv6_lock(sb);
+    while (len) {
+        error = xv6_inode_wblock(ino, block, &bh);
+        if (error) {
+            break;
+        }
+        size_t to_write = BSIZE - boff;
+        to_write = xv6_min(to_write, len);
+        bool page_fault = copy_from_user(bh->b_data + boff, buf, to_write);
+        if (page_fault) {
+            /* wrote something before */
+            error = -EFAULT;
+            mark_buffer_dirty(bh);
+            (void) sync_dirty_buffer(bh);
+            brelse(bh);
+            break;
+        }
+        mark_buffer_dirty(bh);
+        error = sync_dirty_buffer(bh);
+        brelse(bh); 
+        if (error) { break; }
+        bh = NULL;
+        buf += to_write;
+        len -= to_write;
+        nwrite += to_write;
+        cpos += to_write;
+        boff = 0;
+        block += 1;
+    }
+
+    ino->i_size = xv6_max(ino->i_size, cpos);
+    xv6_unlock(sb);
+    *ppos = cpos;
+    if (error && nwrite <= 0) {
+        nwrite = error;
+    }
+    return nwrite;
+}
+
