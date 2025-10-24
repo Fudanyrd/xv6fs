@@ -8,6 +8,14 @@ static const struct file_operations xv6_file_ops = {
     .owner = THIS_MODULE,
     .llseek = xv6_lseek,
     .read_iter = xv6_file_read_iter,
+    .iterate_shared = NULL,
+};
+
+static const struct file_operations xv6_directory_ops = {
+    .owner = THIS_MODULE,
+    .llseek = xv6_lseek,
+    .read_iter = xv6_file_read_iter,
+    .iterate_shared = xv6_readdir,
 };
 
 static int xv6_file_block(struct super_block *sb, const struct dinode *file,

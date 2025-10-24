@@ -62,3 +62,56 @@ static int xv6_find_inum(struct inode *dir, struct dentry *entry, uint *inum) {
     }
     return error;
 }
+
+static int xv6_readdir(struct file *dir, struct dir_context *ctx) {
+    uint cpos = ctx->pos;
+    struct inode *inode = dir->f_inode;
+    struct super_block *sb = inode->i_sb;
+    struct dinode dino;
+    xv6_lock(sb);
+    int error = xv6_dget(inode, &dino);
+    if (error) {
+        goto readdir_fini;
+    }
+    short type = __le16_to_cpu(dino.type);
+    if (type != T_DIR) {
+        error = -ENOTDIR;
+        goto readdir_fini;
+    }
+
+    uint size = __le32_to_cpu(dino.size);
+    xv6_assert(size % sizeof(struct dirent) == 0 && "corrupted directory size");
+    size /= sizeof(struct dirent);
+
+    uint block = cpos / (BSIZE / sizeof(struct dirent));
+    uint offset = cpos % (BSIZE / sizeof(struct dirent));
+    const int nents = BSIZE / sizeof(struct dirent);
+
+    struct buffer_head *bh = NULL;
+    while ((error = xv6_file_block(inode->i_sb, &dino, block, &bh)) == 0) {
+        if (bh == NULL) {
+            break;
+        }
+        const struct dirent *de = (const struct dirent *) bh->b_data;
+        for (int i = offset; i < nents; i++) {
+            if (de[i].inum == 0) {
+                continue; /* unused entry */
+            }
+            if (!dir_emit(ctx, de[i].name, strnlen(de[i].name, DIRSIZ),
+                        __le16_to_cpu(de[i].inum), DT_UNKNOWN)) {
+                brelse(bh);
+                goto readdir_fini;
+            }
+            cpos += 1;
+        }
+        brelse(bh);
+        bh = NULL;
+        block += 1;
+        offset = 0;
+    }
+
+readdir_fini:
+    xv6_unlock(sb);
+    ctx->pos = cpos;
+    return error;
+}

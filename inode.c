@@ -120,6 +120,7 @@ static int xv6_init_inode(struct inode *ino, const struct dinode *dino, uint inu
     ino->i_uid = fsinfo->options.uid;
     ino->i_gid = fsinfo->options.gid;
     ino->i_op = &xv6_inode_ops;
+    ino->i_fop = &xv6_file_ops;
 	inode_inc_iversion(ino);
 	ino->i_generation = get_random_u32();
     set_nlink(ino, __le16_to_cpu(dino->nlink));
@@ -144,6 +145,7 @@ static int xv6_init_inode(struct inode *ino, const struct dinode *dino, uint inu
     if (isdir) {
         mode |= S_IFDIR;
 		ino->i_generation &= ~1;
+        ino->i_fop = &xv6_directory_ops;
     } else {
 		ino->i_generation |= 1;
         mode |= S_IFREG;

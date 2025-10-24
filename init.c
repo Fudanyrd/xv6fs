@@ -99,6 +99,10 @@ static int xv6_init_inode(struct inode *ino, const struct dinode *dino, uint inu
  * @return 0 on success; `reason' on error.
  */
 static int xv6_find_inum(struct inode *dir, struct dentry *entry, uint *inum);
+/*
+ * First holds lock, and list the directory.
+ */
+static int xv6_readdir(struct file *dir, struct dir_context *ctx);
 
 /* 
  * +-+ file.c: file read/write operations. 
@@ -106,6 +110,7 @@ static int xv6_find_inum(struct inode *dir, struct dentry *entry, uint *inum);
  * +-+ 
  */
 static const struct file_operations xv6_file_ops;
+static const struct file_operations xv6_directory_ops;
 /**
  * Sets bhptr to the i'th block of file data. If reaches end,
  * return 0 and set bhptr to NULL.
