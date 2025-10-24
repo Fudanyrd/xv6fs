@@ -40,4 +40,9 @@ struct xv6_fs_info {
     u64 balloc_hint; /* block allocation hint */
 };
 
+/* Used by struct inode::i_private. */
+struct xv6_inode_info {
+    uint addrs[NDIRECT + 1];
+};
+
 #endif // _FSINFO 1

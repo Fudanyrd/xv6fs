@@ -83,6 +83,19 @@ static int xv6_cmp(const struct dentry *dentry,
 static struct inode *xv6_iget(struct super_block *sb, uint inum);
 /* Returns 0 if ok; -ERR otherwise. */
 static int xv6_init_inode(struct inode *ino, const struct dinode *dino, uint inum);
+/* 
+ * Sync size and address of inode to disk inode. 
+ * This does not hold lock.
+ */
+static int xv6_sync_inode(struct inode *ino);
+static int xv6_write_inode(struct inode *ino, struct writeback_control *wbc) {
+    struct super_block *sb = ino->i_sb;
+    xv6_lock(sb);
+    int ret = xv6_sync_inode(ino);
+    xv6_unlock(sb);
+    return ret; 
+}
+static void xv6_evict_inode(struct inode *ino);
 
 /* +-+ dir.c: directory entry operations. These will NOT hold lock. +-+ */
 /* Use dir->i_ino to load an on-disk inode. */

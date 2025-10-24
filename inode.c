@@ -156,7 +156,15 @@ static int xv6_init_inode(struct inode *ino, const struct dinode *dino, uint inu
     ino->i_atime_nsec = ino->i_mtime_nsec = ino->i_ctime_nsec = 0;
     ino->i_mode = mode;
     ino->i_size = __le32_to_cpu(dino->size);
-    ino->i_private = NULL;
+    struct xv6_inode_info *i_info = kmalloc(sizeof(struct xv6_inode_info), GFP_KERNEL);
+    if (!i_info) {
+        return -ENOMEM;
+    }
+    uint *addrs = i_info->addrs;
+    for (int i = 0; i < NDIRECT + 1; i++) {
+        addrs[i] = __le32_to_cpu(dino->addrs[i]);
+    }
+    ino->i_private = i_info;
 
     return 0;
 }
@@ -172,6 +180,49 @@ static int xv6_getattr(struct mnt_idmap *idmap, const struct path *path,
     stat->ino = inode->i_ino;
     return 0;
 }
+
+static int xv6_sync_inode(struct inode *ino) {
+    struct super_block *xv6_sb = ino->i_sb;
+    if (xv6_sb->s_flags & SB_RDONLY) {
+        return 0;
+    }
+
+    const struct xv6_fs_info *fsinfo = xv6_sb->s_fs_info;
+    const uint inum = ino->i_ino;
+    xv6_assert(inum && "null inode found");
+    uint block = fsinfo->inodestart + inum / IPB;
+
+    struct buffer_head *bh = sb_bread(xv6_sb, block);
+    if (bh == NULL) {
+        return -EIO;
+    }
+    struct dinode *dptr = (struct dinode *) bh->b_data;
+    dptr += inum % IPB;
+
+    if (ino->i_private) {
+        uint *addrs = ((struct xv6_inode_info *) ino->i_private)->addrs;
+        for (int i = 0; i < NDIRECT + 1; i++) {
+            dptr->addrs[i] = __cpu_to_le32(addrs[i]);
+        }
+    } else {
+        xv6_warn("inode %lu has no private data\n", ino->i_ino);
+    }
+    dptr->size = __cpu_to_le32((uint) ino->i_size);
+    mark_buffer_dirty(bh);
+    int error = sync_dirty_buffer(bh);
+    brelse(bh);
+    return error;
+}
+
+static void xv6_evict_inode(struct inode *ino) {
+   /*
+    * https://elixir.bootlin.com/linux/v6.17.4/source/fs/autofs/inode.c#L105
+    */
+    clear_inode(ino);
+    kfree(ino->i_private);
+    ino->i_private = NULL;
+}
+
 /* xv6's inode operation struct. '*/
 static const struct inode_operations xv6_inode_ops = {
     .lookup = xv6_lookup,
