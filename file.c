@@ -131,10 +131,20 @@ static ssize_t xv6_file_write(struct file *file, const char __user *buf,
     struct super_block *sb = ino->i_sb;
     ssize_t nwrite = 0;
     loff_t cpos = *ppos;
+    if (file->f_flags & O_APPEND) {
+        /*
+         * When the file is opened with O_APPEND, write(2) will set
+         * file offset to the end.
+         * See man 2 open.
+         */
+        cpos = ino->i_size;
+    }
     uint block = cpos / BSIZE;
     uint boff = cpos % BSIZE;
     struct buffer_head *bh = NULL;
     int error = 0;
+
+    xv6_debug("attempting write %lu bytes, offset %ld in inode %u", len, cpos, ino->i_ino);
 
     xv6_lock(sb);
     while (len) {
