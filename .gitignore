@@ -11,4 +11,5 @@ reference.c
 *.mod.c
 *.img
 mkxv6
+mnt/
 

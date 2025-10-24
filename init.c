@@ -91,6 +91,8 @@ static struct inode *xv6_iget(struct super_block *sb, uint inum);
 static int xv6_init_inode(struct inode *ino, const struct dinode *dino, uint inum);
 
 /* +-+ dir.c: directory entry operations. These will NOT hold lock. +-+ */
+/* Use dir->i_ino to load an on-disk inode. */
+static inline int xv6_dget(struct inode *dir, struct dinode *dino);
 /**
  * Find a directory entry, and set *inum to its inode number.
  * If no error occurred in reading the dir, but entry is not found,
@@ -135,6 +137,8 @@ static int xv6_file_alloc(struct super_block *sb, struct dinode *file,
 static int xv6_update_time(struct inode *a1, int a2) {
     return 0;
 }
+static ssize_t xv6_file_read(struct file *file, char __user *buf,
+            size_t len, loff_t *ppos);
 
 /* +-+ super.c super block operations. +-+ */
 enum {
