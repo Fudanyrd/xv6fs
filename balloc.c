@@ -23,7 +23,7 @@ static inline int xv6_bzero(struct super_block *sb, uint block) {
     return error;
 }
 
-static int xv6_bfree(struct super_block *sb, uint block) {
+static int xv6_bfree_unsafe(struct super_block *sb, uint block) {
     if (sb->s_flags & SB_RDONLY) {
         return -EROFS;
     }
@@ -58,7 +58,7 @@ static int xv6_bfree(struct super_block *sb, uint block) {
     return error;
 }
 
-static int xv6_balloc(struct super_block *sb, uint *block) {
+static int xv6_balloc_unsafe(struct super_block *sb, uint *block) {
     if (sb->s_flags & SB_RDONLY) {
         return -EROFS;
     }
@@ -148,3 +148,16 @@ end_balloc:
     return error;
 }
 
+
+static int xv6_balloc(struct super_block *sb, uint *block) {
+    mutex_lock(xv6_balloc_lock(sb));
+    int error = xv6_balloc_unsafe(sb, block);
+    mutex_unlock(xv6_balloc_lock(sb));
+    return error;
+}
+static int xv6_bfree(struct super_block *sb, uint block) {
+    mutex_lock(xv6_balloc_lock(sb));
+    int error = xv6_bfree_unsafe(sb, block);
+    mutex_unlock(xv6_balloc_lock(sb));
+    return error;
+}

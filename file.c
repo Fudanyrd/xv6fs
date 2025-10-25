@@ -19,6 +19,7 @@ static const struct file_operations xv6_file_ops = {
 static const struct file_operations xv6_directory_ops = {
     .owner = THIS_MODULE,
     .llseek = xv6_lseek,
+    .read = generic_read_dir,
     .read_iter = xv6_file_read_iter,
     .iterate_shared = xv6_readdir,
     .fsync = xv6_file_sync,
@@ -68,14 +69,14 @@ file_end:
 static ssize_t xv6_file_read(struct file *file, char __user *buf,
             size_t len, loff_t *ppos) {
     struct inode *ino = file->f_inode;
-    struct super_block *sb = ino->i_sb;
     ssize_t nread = 0;
     loff_t cpos = *ppos;
     uint block = cpos / BSIZE;
     uint boff = cpos % BSIZE;
     int error = 0;
 
-    xv6_lock(sb);
+    /* Like ext4_file_read_iter, only lock(read) inode. */
+    xv6_ilock_shared(ino);
     size_t file_size = ino->i_size;
     loff_t rest = file_size - cpos;
     if (len > rest) {
@@ -119,7 +120,7 @@ static ssize_t xv6_file_read(struct file *file, char __user *buf,
         block += 1;
     }
 
-    xv6_unlock(sb);
+    xv6_iunlock_shared(ino);
     if (error && nread <= 0) {
         nread = error;
     }
@@ -130,7 +131,6 @@ static ssize_t xv6_file_read(struct file *file, char __user *buf,
 static ssize_t xv6_file_write(struct file *file, const char __user *buf,
             size_t len, loff_t *ppos) {
     struct inode *ino = file->f_inode;
-    struct super_block *sb = ino->i_sb;
     ssize_t nwrite = 0;
     loff_t cpos = *ppos;
     if (file->f_flags & O_APPEND) {
@@ -146,7 +146,8 @@ static ssize_t xv6_file_write(struct file *file, const char __user *buf,
     struct buffer_head *bh = NULL;
     int error = 0;
 
-    xv6_lock(sb);
+    /* Like ext4_file_write_iter, only lock(write) inode. */
+    xv6_ilock_exclusive(ino);
     while (len) {
         error = xv6_inode_wblock(ino, block, &bh);
         if (error) {
@@ -177,7 +178,7 @@ static ssize_t xv6_file_write(struct file *file, const char __user *buf,
     }
 
     ino->i_size = xv6_max(ino->i_size, cpos);
-    xv6_unlock(sb);
+    xv6_iunlock_exclusive(ino);
     *ppos = cpos;
     if (error && nwrite <= 0) {
         nwrite = error;

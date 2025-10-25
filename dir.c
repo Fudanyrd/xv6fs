@@ -60,7 +60,7 @@ static int xv6_find_inum(struct inode *dir, struct dentry *entry, uint *inum) {
 }
 
 static int xv6_readdir(struct file *dir, struct dir_context *ctx) {
-    uint *cpos = &ctx->pos;
+    typeof(ctx->pos) *cpos = &ctx->pos;
     struct inode *inode = dir->f_inode;
     int error;
 

@@ -51,7 +51,7 @@ static int xv6_create(struct mnt_idmap *idmap, struct inode *dir,
 static struct dentry *xv6_lookup(struct inode *dir, struct dentry *dentry,
 			 unsigned int flags) {
     struct super_block *sb = dir->i_sb;
-    xv6_lock(sb);
+    xv6_ilock_shared(dir);
 	struct inode *inode = NULL;
 
     uint inum = 0;
@@ -67,7 +67,7 @@ static struct dentry *xv6_lookup(struct inode *dir, struct dentry *dentry,
         inode = xv6_iget(sb, inum);
     }
 
-    xv6_unlock(sb);
+    xv6_iunlock_shared(dir);
     /* d_splice_alias will use the `IS_ERR` macro to check inode. */
     return d_splice_alias(inode, dentry);
 }
@@ -121,6 +121,7 @@ static int xv6_init_inode(struct inode *ino, const struct dinode *dino, uint inu
     ino->i_gid = fsinfo->options.gid;
     ino->i_op = &xv6_inode_ops;
     ino->i_fop = &xv6_file_ops;
+    init_rwsem(&ino->i_rwsem);
 	inode_inc_iversion(ino);
 	ino->i_generation = get_random_u32();
     set_nlink(ino, __le16_to_cpu(dino->nlink));

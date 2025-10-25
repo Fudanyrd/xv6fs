@@ -26,6 +26,7 @@ struct xv6_mount_options {
 
 struct xv6_fs_info {
     struct mutex build_inode_lock;
+    struct mutex balloc_lock;
     uint size;         // Size of file system image (blocks)
     uint nblocks;      // Number of data blocks
     uint ninodes;      // Number of inodes.

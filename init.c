@@ -17,9 +17,17 @@
 
 /* +-+ locking routine +-+ */
 
+/*
+ * Locking conventions https://docs.kernel.org/filesystems/locking.html
+ */
+
 static inline struct mutex *xv6_get_lock(struct super_block *sb) {
     struct xv6_fs_info *fi = (struct xv6_fs_info *) sb->s_fs_info;
     return &(fi->build_inode_lock);
+}
+static inline struct mutex *xv6_balloc_lock(struct super_block *sb) {
+    struct xv6_fs_info *fi = (struct xv6_fs_info *) sb->s_fs_info;
+    return &(fi->balloc_lock);
 }
 static inline void xv6_lock(struct super_block *sb) {
     mutex_lock(xv6_get_lock(sb));
@@ -28,9 +36,28 @@ static inline void xv6_unlock(struct super_block *sb) {
     mutex_unlock(xv6_get_lock(sb));
 }
 
+/* Lock the inode table. */
+#define xv6_lock_itable(sb) xv6_lock(sb)
+
+/* Unlock the inode table */
+#define xv6_unlock_itable(sb) xv6_unlock(sb)
+
+static inline void xv6_ilock_shared(struct inode *ino) {
+    down_read(&ino->i_rwsem);
+}
+static inline void xv6_ilock_exclusive(struct inode *ino) {
+    down_write(&ino->i_rwsem);
+}
+static inline void xv6_iunlock_shared(struct inode *ino) {
+    up_read(&ino->i_rwsem);
+}
+static inline void xv6_iunlock_exclusive(struct inode *ino) {
+    up_write(&ino->i_rwsem);
+}
+
 /*
  * +-+ balloc.c: allocate/free blocks. 
- * These methods does NOT hold the fs lock.  +-+
+ * These methods does hold the fs_info's lock.  +-+
  */
 /**
  * Search the bitmap for an unused block. If disk full,
@@ -89,10 +116,13 @@ static int xv6_init_inode(struct inode *ino, const struct dinode *dino, uint inu
  */
 static int xv6_sync_inode(struct inode *ino);
 static int xv6_write_inode(struct inode *ino, struct writeback_control *wbc) {
-    struct super_block *sb = ino->i_sb;
-    xv6_lock(sb);
+    /* 
+     * Assuming that only one copy of inode is present in cache, 
+     * It is safe to only hold inode's lock.
+     */
+    xv6_ilock_shared(ino);
     int ret = xv6_sync_inode(ino);
-    xv6_unlock(sb);
+    xv6_iunlock_shared(ino);
     return ret; 
 }
 static void xv6_evict_inode(struct inode *ino);
