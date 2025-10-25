@@ -31,19 +31,22 @@ static int xv6_find_inum(struct inode *dir, struct dentry *entry, uint *inum) {
         return -ENOTDIR;
     }
 
+    const int nents = BSIZE / sizeof(struct dirent);
     uint size = dir->i_size;
     int error;
     xv6_assert(size % sizeof(struct dirent) == 0 && "corrupted directory size");
+    size /= sizeof(struct dirent);
+    xv6_assert(size >= 2 && "directory must contain . and .. entries");
     *inum = 0;
     struct buffer_head *bh = NULL;
     uint block = 0;
     while ((error = xv6_inode_block(dir, block, &bh)) == 0) {
         if (bh == NULL) {
-            break; /* end of file */
+            continue; /* This is a virtual zeroed block. */
         }
         const struct dirent *de = (const struct dirent *) bh->b_data;
-        int nents = BSIZE / sizeof(struct dirent);
-        for (int i = 0; i < nents; i++) {
+        const int lim = xv6_min(nents, size);
+        for (int i = 0; i < lim; i++) {
             if (de[i].inum == 0) {
                 continue; /* unused entry */
             }
@@ -55,6 +58,59 @@ static int xv6_find_inum(struct inode *dir, struct dentry *entry, uint *inum) {
         }
         brelse(bh);
         block += 1;
+        size -= lim;
+        if (size == 0) {
+            break;
+        }
+    }
+    return error;
+}
+
+static int xv6_dentry_alloc(struct inode *dir, const char *name, uint *num) {
+    const uint nents = BSIZE / sizeof(struct dirent);
+    if ((dir->i_mode & S_IFMT) != S_IFDIR) {
+        /* Not a directory. */
+        return -ENOTDIR;
+    }
+
+    if (*name == '.' && (name[1] == '\0' || 
+            (name[1] == '.' && name[2] == '\0'))) {
+        /* Do not allow creating "." or ".." entries. */
+        return -EINVAL;
+    }
+
+    *num = 0;
+    uint size = dir->i_size;
+    uint block = 0;
+    struct buffer_head *bh = NULL;
+    int error;
+    xv6_assert(size % sizeof(struct dirent) == 0 && "corrupted directory size");
+    size /= sizeof(struct dirent);
+    xv6_assert(size >= 2 && "directory must contain . and .. entries");
+    while ((error = xv6_inode_block(dir, block, &bh)) == 0) {
+        if (bh == NULL) {
+            *num = block * nents;
+            continue; /* This is a virtual zeroed block. */
+        }
+        const struct dirent *de = (const struct dirent *) bh->b_data;
+        const int lim = xv6_min(nents, size);
+        for (int i = 0; i < lim; i++) {
+            if (de[i].inum == 0) {
+                *num = block * nents + i;
+                continue; /* unused entry */
+            }
+            if (strncmp(name, de[i].name, DIRSIZ) == 0) {
+                brelse(bh);
+                return -EEXIST;
+            }
+        }
+        brelse(bh);
+        block += 1;
+        size -= lim;
+        if (size == 0) {
+            /* All entries have been checked. */
+            break;
+        }
     }
     return error;
 }

@@ -150,6 +150,13 @@ static inline int xv6_dget(struct inode *dir, struct dinode *dino);
  * @return 0 on success; `reason' on error.
  */
 static int xv6_find_inum(struct inode *dir, struct dentry *entry, uint *inum);
+/**
+ * Try to allocate an directory entry in [0, dir->size). If no empty
+ * entry, *num is set to 0, and returns 0.
+ *
+ * @return -EEXIT if name already exists
+ */
+static int xv6_dentry_alloc(struct inode *dir, const char *name, uint *num);
 /*
  * First holds lock, and list the directory.
  */
