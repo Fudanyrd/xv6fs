@@ -76,7 +76,7 @@ static int xv6_dentry_alloc(struct inode *dir, const char *name, uint *num) {
     if (*name == '.' && (name[1] == '\0' || 
             (name[1] == '.' && name[2] == '\0'))) {
         /* Do not allow creating "." or ".." entries. */
-        return -EINVAL;
+        return -EEXIST;
     }
 
     *num = 0;
@@ -168,3 +168,80 @@ static int xv6_readdir(struct file *dir, struct dir_context *ctx) {
 readdir_fini:
     return error;
 }
+
+static int xv6_dentry_next(struct inode *dir, uint *num) {
+    *num = 0;
+    
+    uint size = dir->i_size;
+    const uint ndents = BSIZE / sizeof(struct dirent);
+    xv6_assert(size % sizeof(struct dirent) == 0);
+    size /= sizeof(struct dirent);
+    size += 1;
+    int error = 0;
+
+    struct buffer_head *bh = NULL;
+    error = xv6_inode_wblock(dir, size / ndents, &bh); 
+    if (error) {
+        return error;
+    }
+    brelse(bh);
+    dir-> i_size = size * sizeof(struct dirent);
+    *num = size - 1;
+
+    return 0;
+}
+
+static int xv6_dentry_write(struct inode *dir, uint dnum, const char *name, 
+            uint inum) {
+    const uint ndents = BSIZE / sizeof(struct dentry);
+    struct buffer_head *bh;
+    int error = 0;
+
+    error = xv6_inode_wblock(dir, dnum / ndents, &bh); 
+    if (error) {
+        return error;
+    }
+
+    struct dirent *de = (struct dirent *) bh->b_data;
+    de += dnum % ndents;
+    memset(de->name, 0, DIRSIZ);
+    strncpy(de->name, name, DIRSIZ);
+    de->inum = __cpu_to_le16(inum);
+    mark_buffer_dirty(bh);
+    error = sync_dirty_buffer(bh);
+    brelse(bh);
+    return error;
+}
+
+static int xv6_dir_init(struct super_block *sb, uint block, 
+            uint inum_parent, uint inum_this) {
+    struct buffer_head *bh;
+    int error;
+
+    bh = sb_bread(sb, block);
+    if (unlikely(bh == NULL)) {
+        (void) xv6_bfree(sb, block);
+        return -EIO;
+    }
+    struct dirent *de = (struct dirent *) bh->b_data;
+    
+    /* Insert . */
+    strcpy(de->name, "."); 
+    de->inum = __cpu_to_le16(inum_this);
+    de ++;
+
+    /* Insert .. */
+    strcpy(de->name, ".."); 
+    de->inum = __cpu_to_le16(inum_parent);
+
+    /* Flush data. */
+    mark_buffer_dirty(bh);
+    error = sync_dirty_buffer(bh);
+    brelse(bh);
+
+    if (error) {
+        (void) xv6_bfree(sb, block);
+    }
+    return error;
+}
+

@@ -78,6 +78,14 @@ static int xv6_bfree(struct super_block *sb, uint block);
 /* +-+ inode.c: inode operations. +-+ */
 static const struct dentry_operations xv6_dentry_ops;
 static const struct inode_operations xv6_inode_ops;
+/** 
+ * Allocates an inode. Will hold itable lock.
+ *
+ * @param dino if not NULL, will copy this to disk.
+ * @return -ENOSPC if cannot find an unused one.
+ */
+static int xv6_ialloc(uint *inum, struct super_block *sb,
+            const struct dinode *dino);
 static int xv6_getattr(struct mnt_idmap *, const struct path *, struct kstat *, 
             u32, unsigned int);
 /** 
@@ -111,7 +119,7 @@ static struct inode *xv6_iget(struct super_block *sb, uint inum);
 /* Returns 0 if ok; -ERR otherwise. */
 static int xv6_init_inode(struct inode *ino, const struct dinode *dino, uint inum);
 /* 
- * Sync size and address of inode to disk inode. 
+ * Sync size, nlink and address of inode to disk inode. 
  * This does not hold lock.
  */
 static int xv6_sync_inode(struct inode *ino);
@@ -139,6 +147,9 @@ static int xv6_inode_block(struct inode *ino, uint i,
  */
 static int xv6_inode_wblock(struct inode *ino, uint i,
             struct buffer_head **bhptr);
+struct dentry *xv6_mkdir (struct mnt_idmap *mmap, struct inode *dir, 
+            struct dentry *dentry, umode_t mode);
+
 /* +-+ dir.c: directory entry operations. These will NOT hold lock. +-+ */
 /* Use dir->i_ino to load an on-disk inode. */
 static inline int xv6_dget(struct inode *dir, struct dinode *dino);
@@ -157,6 +168,15 @@ static int xv6_find_inum(struct inode *dir, struct dentry *entry, uint *inum);
  * @return -EEXIT if name already exists
  */
 static int xv6_dentry_alloc(struct inode *dir, const char *name, uint *num);
+
+/**
+ * Extend directory by one entry, and set *num.
+ */
+static int xv6_dentry_next(struct inode *dir, uint *num);
+
+static int xv6_dentry_write(struct inode *dir, uint dnum, const char *name, uint inum);
+static int xv6_dir_init(struct super_block *sb, uint block, 
+            uint inum_parent, uint inum_this);
 /*
  * First holds lock, and list the directory.
  */

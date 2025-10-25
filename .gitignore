@@ -4,6 +4,7 @@ fat
 *.swp
 *.o
 *.mod
+*.log
 *.ko
 Module.symvers
 modules.order
