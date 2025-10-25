@@ -60,11 +60,18 @@ static int xv6_find_inum(struct inode *dir, struct dentry *entry, uint *inum) {
 }
 
 static int xv6_readdir(struct file *dir, struct dir_context *ctx) {
-    uint cpos = ctx->pos;
+    uint *cpos = &ctx->pos;
     struct inode *inode = dir->f_inode;
-    struct super_block *sb = inode->i_sb;
     int error;
-    xv6_lock(sb);
+
+    /*
+     * You should really understand the VFS's locking protocols,
+     * it says: this is callled without any locks held! 😃
+     *
+     * Just like ext4_readdir, I do not try to hold locks,
+     * because iterate_dir(which getdents relies on) already held
+     * read lock.
+     */
     
     if ((inode->i_mode & S_IFMT) != S_IFDIR) {
         error = -ENOTDIR;
@@ -75,8 +82,8 @@ static int xv6_readdir(struct file *dir, struct dir_context *ctx) {
     xv6_assert(size % sizeof(struct dirent) == 0 && "corrupted directory size");
     size /= sizeof(struct dirent);
 
-    uint block = cpos / (BSIZE / sizeof(struct dirent));
-    uint offset = cpos % (BSIZE / sizeof(struct dirent));
+    uint block = *cpos / (BSIZE / sizeof(struct dirent));
+    uint offset = *cpos % (BSIZE / sizeof(struct dirent));
     const int nents = BSIZE / sizeof(struct dirent);
 
     struct buffer_head *bh = NULL;
@@ -94,7 +101,7 @@ static int xv6_readdir(struct file *dir, struct dir_context *ctx) {
                 brelse(bh);
                 goto readdir_fini;
             }
-            cpos += 1;
+            (*cpos) += 1;
         }
         brelse(bh);
         bh = NULL;
@@ -103,7 +110,5 @@ static int xv6_readdir(struct file *dir, struct dir_context *ctx) {
     }
 
 readdir_fini:
-    xv6_unlock(sb);
-    ctx->pos = cpos;
     return error;
 }
