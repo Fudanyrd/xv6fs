@@ -90,18 +90,14 @@ static int xv6_dentry_alloc(struct inode *dir, const char *name, uint *num) {
     while ((error = xv6_inode_block(dir, block, &bh)) == 0) {
         if (bh == NULL) {
             *num = block * nents;
-            continue; /* This is a virtual zeroed block. */
+            break; /* This is a virtual zeroed block. */
         }
         const struct dirent *de = (const struct dirent *) bh->b_data;
         const int lim = xv6_min(nents, size);
         for (int i = 0; i < lim; i++) {
             if (de[i].inum == 0) {
                 *num = block * nents + i;
-                continue; /* unused entry */
-            }
-            if (strncmp(name, de[i].name, DIRSIZ) == 0) {
-                brelse(bh);
-                return -EEXIST;
+                break; /* unused entry */
             }
         }
         brelse(bh);
@@ -193,7 +189,7 @@ static int xv6_dentry_next(struct inode *dir, uint *num) {
 
 static int xv6_dentry_write(struct inode *dir, uint dnum, const char *name, 
             uint inum) {
-    const uint ndents = BSIZE / sizeof(struct dentry);
+    const uint ndents = BSIZE / sizeof(struct dirent);
     struct buffer_head *bh;
     int error = 0;
 

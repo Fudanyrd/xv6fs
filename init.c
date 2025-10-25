@@ -94,7 +94,8 @@ static int xv6_getattr(struct mnt_idmap *, const struct path *, struct kstat *,
 static int xv6_create(struct mnt_idmap *idmap, struct inode *dir,
             struct dentry *dentry, umode_t mode, bool extc);
 /*
- * It holds the lock, and look up dentry->name in directory.
+ * It ~~holds the lock, and~~ looks up dentry->name in directory.
+ * Like ext4_lookup, it does not hold any locks.
  */
 static struct dentry *xv6_lookup(struct inode *dir, struct dentry *dentry,
 			 unsigned int flags);

@@ -22,7 +22,7 @@ static int xv6_ialloc(uint *inum, struct super_block *sb,
     struct buffer_head *bh = NULL;
     int error = 0;
 
-    // xv6_lock_itable(sb);
+    xv6_lock_itable(sb);
     for (; block < blockend; block++) {
         bh = sb_bread(sb, block);
         if (!bh) {
@@ -53,7 +53,7 @@ static int xv6_ialloc(uint *inum, struct super_block *sb,
         }
         off = 0;
     }
-    // xv6_unlock_itable(sb);
+    xv6_unlock_itable(sb);
 
     if (*inum == 0 && error == 0)
         error = -ENOSPC; 
@@ -121,14 +121,13 @@ static int xv6_cmp(const struct dentry *dentry,
 static struct dentry *xv6_lookup(struct inode *dir, struct dentry *dentry,
 			 unsigned int flags) {
     struct super_block *sb = dir->i_sb;
-    xv6_ilock_shared(dir);
 	struct inode *inode = NULL;
 
     uint inum = 0;
     int reason = xv6_find_inum(dir, dentry, &inum);
     if (!inum) {
-        /* Not found */
-        inode = ERR_PTR(-ENOENT);
+        /* Not found. Like vfat_lookup, should return null. */
+        return NULL;
     } else if (reason) {
         /* Some error occurred */
         inode = ERR_PTR(reason);
@@ -137,7 +136,6 @@ static struct dentry *xv6_lookup(struct inode *dir, struct dentry *dentry,
         inode = xv6_iget(sb, inum);
     }
 
-    xv6_iunlock_shared(dir);
     /* d_splice_alias will use the `IS_ERR` macro to check inode. */
     return d_splice_alias(inode, dentry);
 }
@@ -448,7 +446,6 @@ wblock_clean:
 static int xv6_create(struct mnt_idmap *idmap, struct inode *dir,
             struct dentry *dentry, umode_t mode, bool extc) {
     const char *name = dentry->d_name.name;
-    xv6_info("creating %s", name);
     if (strlen(name) > DIRSIZ) {
         return -ENAMETOOLONG;
     }
@@ -468,6 +465,7 @@ static int xv6_create(struct mnt_idmap *idmap, struct inode *dir,
     if ((mode & S_IFMT) == S_IFDIR) {
         dino.type = __cpu_to_le16(T_DIR);
         isdir = true;
+        dino.size = sizeof(struct dirent) * 2; /* . and .. */
     } else {
         dino.type = __cpu_to_le16(T_FILE);
         isdir = false;
@@ -480,11 +478,9 @@ static int xv6_create(struct mnt_idmap *idmap, struct inode *dir,
         dino.addrs[0] = __cpu_to_le32(dino.addrs[0]);
     }
     if (error) { goto create_fini; }
-    xv6_info("allocate a data block");
 
     error = xv6_ialloc(&inum, sb, &dino);
     if (error) { goto create_fini; }
-    xv6_info("allocate inode %u", inum);
     if (isdir) {
         error = xv6_dir_init(sb, __le32_to_cpu(dino.addrs[0]), 
                     dir->i_ino, inum);
@@ -498,7 +494,6 @@ static int xv6_create(struct mnt_idmap *idmap, struct inode *dir,
         goto create_fini;
     }
     
-    // xv6_ilock_exclusive(dir);
     error = xv6_dentry_alloc(dir, name, &dnum);
     if (error) {
         goto create_fini_unlock;
@@ -509,13 +504,15 @@ static int xv6_create(struct mnt_idmap *idmap, struct inode *dir,
             goto create_fini_unlock;
         }
         xv6_assert(dnum != 0);
+        if ((error = xv6_sync_inode(dir)) != 0) {
+            goto create_fini_unlock;
+        }
     }
     if ((error = xv6_dentry_write(dir, dnum, name, inum)) != 0) {
         goto create_fini_unlock;
     }
 
 create_fini_unlock:
-    // xv6_iunlock_exclusive(dir);
 create_fini:
     if (error) {
         iput(newinode);
@@ -532,6 +529,11 @@ struct dentry *xv6_mkdir (struct mnt_idmap *mmap, struct inode *dir,
     return error ? ERR_PTR(error) : NULL;
 }
 
+static int xv6_setattr (struct mnt_idmap *a1, struct dentry *a2, 
+            struct iattr *a3) {
+    return 0;
+}
+
 /* xv6's inode operation struct. '*/
 static const struct inode_operations xv6_inode_ops = {
     .lookup = xv6_lookup,
@@ -539,6 +541,7 @@ static const struct inode_operations xv6_inode_ops = {
     .update_time = xv6_update_time,
     .permission = NULL,
     .getattr = xv6_getattr,
+    .setattr = xv6_setattr,
     .mkdir = xv6_mkdir,
 };
 
