@@ -8,13 +8,21 @@
 //! This creates a xv6 filesystem image in fs.img, and 
 //! copies file1, file2 to its root directory.
 //!
+//! + Introduced since 94005764
+//! For each 'file' to be copied into disk image, we
+//! find that it is an directory, we also create a 
+//! directory in image, instead of a regular file.
 
+
+#include <stdbool.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
 #include <assert.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #define XV6_LOCAL(Type) static Type
 #define KERN_ERROR "Error: "
@@ -38,6 +46,7 @@ static int (*printk)(const char *fmt, ...) = printf;
 #define MAXPATH      128   // maximum file path name
 #define USERSTACK    1     // user stack pages
 
+typedef struct stat unix_stat;
 #define stat xv6_stat  // avoid clash with host struct stat
 
 #ifndef static_assert
@@ -180,17 +189,36 @@ main(int argc, char *argv[])
       shortname += 1;
 
     assert(strlen(shortname) <= DIRSIZ);
+
+    unix_stat st;
+    if (fstat(fd, &st) < 0)
+      die("fstat");
+    bool isdir = S_ISDIR(st.st_mode);
     
-    inum = ialloc(T_FILE);
+    inum = isdir ? ialloc(T_DIR) : ialloc(T_FILE);
+    if (isdir) {
+      // create . and .. entries
+      struct dirent de2;
+      bzero(&de2, sizeof(de2));
+      de2.inum = xshort(inum);
+      strcpy(de2.name, ".");
+      iappend(inum, &de2, sizeof(de2));
+
+      bzero(&de2, sizeof(de2));
+      de2.inum = xshort(rootino);
+      strcpy(de2.name, "..");
+      iappend(inum, &de2, sizeof(de2));
+    } else {
+
+      while((cc = read(fd, buf, sizeof(buf))) > 0)
+        iappend(inum, buf, cc);
+    }
 
     bzero(&de, sizeof(de));
     de.inum = xshort(inum);
     strncpy(de.name, shortname, DIRSIZ);
     iappend(rootino, &de, sizeof(de));
-
-    while((cc = read(fd, buf, sizeof(buf))) > 0)
-      iappend(inum, buf, cc);
-
+  
     close(fd);
   }
 
