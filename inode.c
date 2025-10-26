@@ -567,12 +567,12 @@ static int xv6_inode_clear(struct inode *inode) {
         }
     }
 
-    if (addrs[NDIRECT]) {
-        struct buffer_head *bh = sb_bread(sb, addrs[NDIRECT]);
+    uint iaddr = addrs[NDIRECT];
+    if (iaddr) {
+        struct buffer_head *bh = sb_bread(sb, iaddr);
         if (bh == NULL) {
             return -EIO;
         }
-        addrs[NDIRECT] = 0;
         uint *iaddrs = (uint *) bh->b_data;
         for (int i = 0; i < NINDIRECT; i++) {
             if (iaddrs[i] != 0) {
@@ -580,7 +580,9 @@ static int xv6_inode_clear(struct inode *inode) {
             }
         }
         brelse(bh);
+        (void) xv6_bfree(sb, iaddr);
     }
+    addrs[NDIRECT] = 0;
 
     inode->i_size = 0;
     mark_inode_dirty(inode);
@@ -606,6 +608,8 @@ static const struct inode_operations xv6_inode_ops = {
     .getattr = xv6_getattr,
     .setattr = xv6_setattr,
     .mkdir = xv6_mkdir,
+    .rmdir = xv6_rmdir,
+    .unlink = xv6_unlink,
 };
 
 /* comparison */

@@ -191,6 +191,14 @@ static int xv6_dir_init(struct super_block *sb, uint block,
  */
 static int xv6_readdir(struct file *dir, struct dir_context *ctx);
 
+static int xv6_unlink(struct inode *dir, struct dentry *entry);
+/* Erase the dentry whose inode number is inum. */
+static int xv6_dir_erase(struct inode *dir, int inum);
+
+static int xv6_rmdir(struct inode *dir, struct dentry *entry) {
+    return xv6_unlink (dir, entry);
+}
+
 /* 
  * +-+ file.c: file read/write operations. 
  * (directory is organized much like a file) 
@@ -235,6 +243,7 @@ static int xv6_file_sync(struct file *file, loff_t start, loff_t end, int arg4) 
 static int xv6_file_flush(struct file *file, fl_owner_t id) {
     return xv6_write_inode(file->f_inode, NULL);
 }
+static int xv6_unlink(struct inode *dir, struct dentry *entry);
 
 /* +-+ super.c super block operations. +-+ */
 enum {

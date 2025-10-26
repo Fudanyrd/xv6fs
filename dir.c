@@ -241,3 +241,46 @@ static int xv6_dir_init(struct super_block *sb, uint block,
     return error;
 }
 
+static int xv6_dir_erase(struct inode *dir, int inum) {
+    const int nents = BSIZE / sizeof(struct dirent);
+    uint size = dir->i_size;
+    int error;
+    xv6_assert(size % sizeof(struct dirent) == 0 && "corrupted directory size");
+    size /= sizeof(struct dirent);
+    xv6_assert(size >= 2 && "directory must contain . and .. entries");
+    struct buffer_head *bh = NULL;
+    uint block = 0;
+
+    while ((error = xv6_inode_block(dir, block, &bh)) == 0) {
+        if (bh == NULL) {
+            continue; /* This is a virtual zeroed block. Ignore */
+        }
+        struct dirent *de = (struct dirent *) bh->b_data;
+        const int lim = xv6_min(nents, size);
+        for (int i = 0; i < lim; i++) {
+            if (de[i].inum == __cpu_to_le16(inum)) {
+                de[i].inum = 0;
+                de[i].name[0] = 0;
+                goto derase_found;
+            }
+        }
+        brelse(bh);
+        block += 1;
+        size -= lim;
+        if (size == 0) {
+            break;
+        }
+    }
+
+    if (!error) {
+        /* Not found. */
+        error = -ENOENT;
+    }
+    return error;
+
+derase_found:
+    mark_buffer_dirty(bh);
+    error = sync_dirty_buffer(bh);
+    brelse(bh);
+    return error;
+}

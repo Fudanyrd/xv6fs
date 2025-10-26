@@ -186,3 +186,35 @@ static ssize_t xv6_file_write(struct file *file, const char __user *buf,
     return nwrite;
 }
 
+static int xv6_unlink(struct inode *dir, struct dentry *entry) {
+    struct super_block *sb = dir->i_sb;
+    struct inode *file_ino = entry->d_inode;
+    uint file_inum = file_ino->i_ino;
+    inode_dec_link_count(file_ino);
+    uint nlink = file_ino->i_nlink;
+    if (nlink) {
+        return 0;
+    }
+    xv6_assert(file_inum);
+    if (file_inum == ROOTINO) {
+        /* Cannot remove root. */
+        return -EBUSY;
+    }
+    if (file_inum == dir->i_ino) {
+        /* Trying to unlink . */
+        return -EINVAL;
+    }
+    
+    /* Firstly, clear the inode. */
+    int error = xv6_inode_clear(file_ino);
+    if (error) {
+        return error;
+    }
+
+    /* Next, find it in the directory and remove the entry. */
+    error = xv6_dir_erase(dir, file_inum);
+
+    /* Last, safely free the inode in the itable. */
+    error = xv6_ifree(sb, file_inum);
+    return error;
+}
