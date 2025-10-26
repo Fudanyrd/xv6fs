@@ -219,6 +219,7 @@ static void xv6_kill_block_super(struct super_block *sb) {
     struct inode *inode;
     list_for_each_entry(inode, &sb->s_inodes, i_sb_list) {
         xv6_assert(inode && inode->i_sb == sb);
+        write_inode_now(inode, 1);
     }
     kill_block_super(sb);
 }
