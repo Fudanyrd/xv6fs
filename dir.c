@@ -284,3 +284,61 @@ derase_found:
     brelse(bh);
     return error;
 }
+
+/* Test whether this directory can be safely removed. */
+static int xv6_dir_rmtest(struct inode *dir) {
+
+    bool ret = true;
+    const int nents = BSIZE / sizeof(struct dirent);
+    uint size = dir->i_size;
+    int error;
+    xv6_assert(size % sizeof(struct dirent) == 0 && "corrupted directory size");
+    size /= sizeof(struct dirent);
+    xv6_assert(size >= 2 && "directory must contain . and .. entries");
+    struct buffer_head *bh = NULL;
+    uint block = 0;
+    uint boff = 2; /* Should ignore . and .. */
+    while ((error = xv6_inode_block(dir, block, &bh)) == 0) {
+        if (bh == NULL) {
+            continue; /* This is a virtual zeroed block. */
+        }
+        const struct dirent *de = (const struct dirent *) bh->b_data;
+        const int lim = xv6_min(nents - boff, size);
+        for (int i = boff; i < lim; i++) {
+            if (de[i].inum == 0) {
+                continue; /* unused entry */
+            }
+            ret = false; break;
+        }
+        brelse(bh);
+        block += 1;
+        size -= lim;
+        boff = 0;
+        if (size == 0 || !ret) {
+            break;
+        }
+    }
+
+    if (error) {
+        /* oops, do not try to do anything instead. */
+        return error;
+    }
+    return ret ? 0 : -ENOTEMPTY;
+}
+
+static int xv6_rmdir(struct inode *dir, struct dentry *entry) {
+    if ((dir->i_mode & S_IFMT) != S_IFDIR) {
+        return -ENOTDIR;
+    }
+    if ((entry->d_inode->i_mode & S_IFMT) != S_IFDIR) {
+        return -ENOTDIR;
+    }
+
+    int error = xv6_dir_rmtest(entry->d_inode);
+    if (error) {
+        /* Directory not empty, or other error. */
+        return error;
+    }
+
+    return xv6_unlink(dir, entry);
+}

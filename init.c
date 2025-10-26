@@ -195,9 +195,7 @@ static int xv6_unlink(struct inode *dir, struct dentry *entry);
 /* Erase the dentry whose inode number is inum. */
 static int xv6_dir_erase(struct inode *dir, int inum);
 
-static int xv6_rmdir(struct inode *dir, struct dentry *entry) {
-    return xv6_unlink (dir, entry);
-}
+static int xv6_rmdir(struct inode *dir, struct dentry *entry);
 
 /* 
  * +-+ file.c: file read/write operations. 
