@@ -150,27 +150,29 @@ static struct inode *xv6_iget(struct super_block *sb, uint inum) {
     const struct dinode *disk_inode;
     uint inode_block = inode_start + inum / IPB;
     struct buffer_head *bh = NULL;
-    int error;
-    struct inode *inode = NULL;
+    int error = 0;
+    bool found = false;
+    struct inode *inode = xv6_find_inode(sb, inum, &found);
+    if (inode == NULL) {
+        error = -ENOMEM;
+        goto iget_fini;
+    }
+    if (found) { goto iget_fini; } /* can skip initialization. */
 
     /* Load the inode from disk. */
     bh = sb_bread(sb, inode_block);
     if (bh == NULL) {
-        return ERR_PTR(-EIO);
+        error = -EIO;
+        goto iget_fini;
     }
 
-    inode = new_inode(sb);
-    if (inode == NULL) {
-        error = (-ENOMEM);
-        goto iget_fini;
-    } /* need to free(inode) or return inode. */
     disk_inode = (const struct dinode *) (bh->b_data);
     disk_inode += inum % IPB;
     inode->i_ino = inum;
     error = xv6_init_inode(inode, disk_inode, inum);
+    brelse(bh);
 
 iget_fini:
-    brelse(bh);
     if (error) {
         if (inode) { iput(inode); }
         return ERR_PTR(error);
@@ -517,6 +519,12 @@ create_fini:
     if (error) {
         iput(newinode);
     } else {
+        /* Add the inode to the tree, without checking. */
+        struct xv6_fs_info *fsinfo = (struct xv6_fs_info *)(sb->s_fs_info);
+        struct xv6_inode *xi = container_of(newinode, struct xv6_inode, inode);
+        mutex_lock(&fsinfo->itree_lock);
+        rb_add(&xi->rbnode, &fsinfo->inode_tree, xv6_rb_less);
+        mutex_unlock(&fsinfo->itree_lock);
         d_instantiate(dentry, newinode);
     }
     return error;
@@ -532,6 +540,61 @@ struct dentry *xv6_mkdir (struct mnt_idmap *mmap, struct inode *dir,
 static int xv6_setattr (struct mnt_idmap *a1, struct dentry *a2, 
             struct iattr *a3) {
     return 0;
+}
+
+static int xv6_inode_clear(struct inode *inode) {
+    int error= 0;
+    struct super_block *sb = inode->i_sb;
+    struct dinode dino;
+    uint *addrs;
+    if (unlikely(inode->i_private == NULL)) {
+        /* warn potential ENOMEM */
+        error = xv6_dget(inode, &dino);
+        if (error) { return error; }
+        for (int i = 0; i < NDIRECT + 1; i++) {
+            dino.addrs[i] = __le32_to_cpu(dino.addrs[i]);
+        }
+        addrs = dino.addrs;
+    } else {
+        struct xv6_inode_info *tmp = inode->i_private;
+        addrs = tmp->addrs;
+    }
+
+    for (int i = 0; i < NDIRECT; i++) {
+        if (addrs[i] != 0) {
+            (void) xv6_bfree(sb, addrs[i]);
+            addrs[i] = 0;
+        }
+    }
+
+    if (addrs[NDIRECT]) {
+        struct buffer_head *bh = sb_bread(sb, addrs[NDIRECT]);
+        if (bh == NULL) {
+            return -EIO;
+        }
+        addrs[NDIRECT] = 0;
+        uint *iaddrs = (uint *) bh->b_data;
+        for (int i = 0; i < NINDIRECT; i++) {
+            if (iaddrs[i] != 0) {
+                (void) xv6_bfree(sb, __le32_to_cpu(iaddrs[i]));
+            }
+        }
+        brelse(bh);
+    }
+
+    inode->i_size = 0;
+    mark_inode_dirty(inode);
+    if (unlikely(inode->i_private == NULL)) {
+        /* write this inode to disk. */
+        xv6_assert(offsetof(struct xv6_inode_info, addrs) == 0);
+        inode->i_private = addrs;
+        /* sync method depends on i_private to work properly. */
+        error = xv6_sync_inode(inode);
+        inode->i_private = NULL;
+    } else {
+        error = xv6_sync_inode(inode);
+    }
+    return error;
 }
 
 /* xv6's inode operation struct. '*/

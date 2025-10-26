@@ -63,7 +63,10 @@ static int xv6_fill_super(struct super_block *sb, struct fs_context *fc) {
     fsinfo->logstart = __le32_to_cpu(xv6_sb->logstart);
     fsinfo->inodestart = __le32_to_cpu(xv6_sb->inodestart);
     fsinfo->bmapstart = __le32_to_cpu(xv6_sb->bmapstart);
+    mutex_init(&fsinfo->itree_lock);
+    fsinfo->inode_tree = RB_ROOT;
     brelse(bh); bh = NULL;
+    // xv6_error("got here, line %d", __LINE__);
 
     struct dirent dummy;
     const typeof(dummy.inum) ninodes_max = (typeof(dummy.inum)) (-1);
@@ -107,7 +110,7 @@ static int xv6_fill_super(struct super_block *sb, struct fs_context *fc) {
      */
 
     /* Read root directory. */
-    root_dir = new_inode(sb);
+    root_dir = xv6_find_inode(sb, ROOTINO, NULL);
     error = -ENOMEM;
     if (!root_dir) {
         goto out_fail;
@@ -214,9 +217,106 @@ static void xv6_kill_block_super(struct super_block *sb) {
     kill_block_super(sb);
 }
 
+static inline int xv6_rb_cmp(const void *key, const struct rb_node *node) {
+    unsigned long a = (unsigned long) key;
+    struct xv6_inode *xi = container_of(node, struct xv6_inode, rbnode);
+    unsigned long b = xi->inode.i_ino;
+    if (a < b) {
+        return -1;
+    } else if (a > b) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+static bool xv6_rb_less(struct rb_node *node1, const struct rb_node *node2) {
+    struct xv6_inode *a = container_of(node1, struct xv6_inode, rbnode);
+    struct xv6_inode *b = container_of(node2, struct xv6_inode, rbnode);
+    return a->inode.i_ino < b->inode.i_ino;
+}
+
+static struct inode *xv6_find_inode(struct super_block *sb, uint inum, bool *fp) {
+    if (unlikely (!inum)) {
+        return xv6_alloc_inode(sb);
+    }
+
+    struct xv6_fs_info *fsinfo = (struct xv6_fs_info *)(sb->s_fs_info);
+    struct xv6_inode *xi = NULL;
+    mutex_lock(&fsinfo->itree_lock);
+    struct rb_node *node = rb_find((const void *)(unsigned long) inum,
+            &fsinfo->inode_tree, xv6_rb_cmp);
+
+    if (node) {
+        xi = container_of(node, struct xv6_inode, rbnode);
+        xi->refcount++;
+        goto find_fini;    
+    }
+    /* 
+     * Here `new_inode' will use xv6_alloc_inode to allocate,
+     * and do proper initialization, such as `inode_sb_list_add'
+     * Other members therefore, can safely use find_inode to
+     * both lookup and allocate inode.
+     *
+     * https://elixir.bootlin.com/linux/v6.17.4/source/fs/inode.c#L340
+     */
+    struct inode *iptr = new_inode(sb);
+    if (!iptr) {
+        xi = NULL;
+        goto find_fini;
+    }
+    xi = container_of(iptr, struct xv6_inode, inode);
+    xv6_assert(iptr == &xi->inode);
+    xi->refcount = 1;
+    xi->inode.i_ino = inum;
+    rb_add(&xi->rbnode, &fsinfo->inode_tree, xv6_rb_less);
+
+find_fini:
+    mutex_unlock(&fsinfo->itree_lock);
+    if (fp) {
+        *fp = (bool) node;
+    }
+    return xi != NULL ?  &xi->inode : NULL;
+}
+
+static struct inode *xv6_alloc_inode(struct super_block *sb) {
+    struct xv6_inode *xi = kmalloc(sizeof(struct xv6_inode), GFP_KERNEL);
+    if (likely(xi)) {
+        xi->refcount = 1;
+        xi->inode.i_sb = sb;
+        return &xi->inode;
+    }
+    return NULL;
+}
+
+static void xv6_free_inode(struct inode *inode) {
+    if (unlikely(!inode)) {
+        return;
+    }
+    uint inum = inode->i_ino;
+    struct super_block *sb = inode->i_sb;
+    struct xv6_fs_info *fsinfo = (struct xv6_fs_info *)(sb->s_fs_info);
+    struct xv6_inode *xi = container_of(inode, struct xv6_inode, inode);
+
+    mutex_lock(&fsinfo->itree_lock);
+    if (--xi->refcount > 0) {
+        mutex_unlock(&fsinfo->itree_lock);
+        return;
+    }
+    struct rb_node *node = rb_find(&fsinfo->inode_tree, 
+            (const void *)(unsigned long) inum, xv6_rb_cmp);
+    if (likely(node)) {
+        rb_erase(node, &fsinfo->inode_tree);
+        xv6_assert(node == &xi->rbnode);
+    } else {
+        xv6_warn("Inode %u not found in inode tree during free.", inum);
+    }
+    mutex_unlock(&fsinfo->itree_lock);
+    kfree(xi);
+}
+
 static const struct super_operations xv6_super_ops = {
-    .alloc_inode = NULL,
-    .free_inode = NULL,
+    .alloc_inode = xv6_alloc_inode,
+    .free_inode = xv6_free_inode,
     .destroy_inode = NULL,
     .show_options = xv6_show_options,
     .write_inode = xv6_write_inode,

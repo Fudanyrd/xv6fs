@@ -7,6 +7,7 @@
 #include <linux/fs.h>
 #include <linux/fs_context.h>
 #include <linux/fs_parser.h>
+#include <linux/rbtree.h>
 #include <linux/uidgid.h>
 #include <linux/vfs.h>
 #include <asm/atomic.h>
@@ -150,6 +151,8 @@ static int xv6_inode_wblock(struct inode *ino, uint i,
             struct buffer_head **bhptr);
 struct dentry *xv6_mkdir (struct mnt_idmap *mmap, struct inode *dir, 
             struct dentry *dentry, umode_t mode);
+/* Free all data blocks and indirect block of file. */
+static int xv6_inode_clear(struct inode *inode);
 
 /* +-+ dir.c: directory entry operations. These will NOT hold lock. +-+ */
 /* Use dir->i_ino to load an on-disk inode. */
@@ -221,8 +224,6 @@ static ssize_t xv6_file_read(struct file *file, char __user *buf,
             size_t len, loff_t *ppos);
 static ssize_t xv6_file_write(struct file *file, const char __user *buf,
             size_t len, loff_t *ppos);
-/* Free all data blocks and indirect block of file. */
-static int xv6_file_clear(struct file *file);
 static int xv6_file_sync(struct file *file, loff_t start, loff_t end, int arg4) {
     return xv6_write_inode(file->f_inode, NULL);
 }
@@ -240,6 +241,21 @@ static const struct fs_parameter_spec xv6_param_spec[] = {
 	fsparam_gid	("gid",		XV6_GID),
     {},
 };
+
+static bool xv6_rb_less(struct rb_node *node1, const struct rb_node *node2);
+static struct inode *xv6_alloc_inode(struct super_block *sb);
+static void xv6_free_inode(struct inode *inode);
+/**
+ * First search in inode tree; it it exists, then increment
+ * its reference count, and return it; else allocate a new one 
+ * via `new_inode', and add it to the tree.
+ *
+ * @param[out] found only set to true if it is found in the tree,
+ *   not allocated and inserted. 
+ * @return NULL to indicate -ENOMEM.
+ */
+static struct inode *xv6_find_inode(struct super_block *sb, uint inum, bool *found);
+
 static int xv6_parse_param(struct fs_context *fc, struct fs_parameter *param);
 static int xv6_show_options(struct seq_file *m, struct dentry *root);
 static int xv6fs_init_fs_ctx(struct fs_context *fs_ctx);
