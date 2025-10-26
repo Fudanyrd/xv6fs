@@ -54,8 +54,6 @@ static int xv6_fill_super(struct super_block *sb, struct fs_context *fc) {
             __le32_to_cpu(xv6_sb->magic));
         goto out_fail;
     }
-    mutex_init(&fsinfo->balloc_lock);
-    mutex_init(&fsinfo->build_inode_lock);
     fsinfo->size = __le32_to_cpu(xv6_sb->size);
     fsinfo->nblocks = __le32_to_cpu(xv6_sb->nblocks);
     fsinfo->ninodes = __le32_to_cpu(xv6_sb->ninodes);
@@ -63,9 +61,12 @@ static int xv6_fill_super(struct super_block *sb, struct fs_context *fc) {
     fsinfo->logstart = __le32_to_cpu(xv6_sb->logstart);
     fsinfo->inodestart = __le32_to_cpu(xv6_sb->inodestart);
     fsinfo->bmapstart = __le32_to_cpu(xv6_sb->bmapstart);
-    mutex_init(&fsinfo->itree_lock);
-    fsinfo->inode_tree = RB_ROOT;
     brelse(bh); bh = NULL;
+    mutex_init(&fsinfo->itree_lock);
+    mutex_init(&fsinfo->balloc_lock);
+    mutex_init(&fsinfo->build_inode_lock);
+    fsinfo->inode_tree = RB_ROOT;
+	fsinfo->options = *(const struct xv6_mount_options *)(fc->fs_private);
     // xv6_error("got here, line %d", __LINE__);
 
     struct dirent dummy;
@@ -140,7 +141,6 @@ static int xv6_fill_super(struct super_block *sb, struct fs_context *fc) {
 
 	/* Apply parsed options to sbi (structure copy) */
     /* Finished without error. */
-	fsinfo->options = *(const struct xv6_mount_options *)(fc->fs_private);
     xv6_info("Mounted xv6fs with uid=%u, gid=%u",
         from_kuid_munged(&init_user_ns, fsinfo->options.uid),
         from_kgid_munged(&init_user_ns, fsinfo->options.gid));
@@ -268,6 +268,7 @@ static struct inode *xv6_find_inode(struct super_block *sb, uint inum, bool *fp)
     xv6_assert(iptr == &xi->inode);
     xi->refcount = 1;
     xi->inode.i_ino = inum;
+    xi->inode.i_sb = sb;
     rb_add(&xi->rbnode, &fsinfo->inode_tree, xv6_rb_less);
 
 find_fini:
