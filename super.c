@@ -214,6 +214,12 @@ static void xv6_kill_block_super(struct super_block *sb) {
     /* 😭 Should not dput sb->s_root here. */
     /* Read the implementation of kill_block_super :) */
     xv6_info ("Unmounting xv6fs");
+    
+
+    struct inode *inode;
+    list_for_each_entry(inode, &sb->s_inodes, i_sb_list) {
+        xv6_assert(inode && inode->i_sb == sb);
+    }
     kill_block_super(sb);
 }
 
@@ -280,7 +286,7 @@ find_fini:
 }
 
 static struct inode *xv6_alloc_inode(struct super_block *sb) {
-    struct xv6_inode *xi = kmalloc(sizeof(struct xv6_inode), GFP_KERNEL);
+    struct xv6_inode *xi = alloc_inode_sb(sb, xv6_inode_cachep, GFP_NOFS);
     if (likely(xi)) {
         xi->refcount = 1;
         xi->inode.i_sb = sb;
@@ -303,8 +309,8 @@ static void xv6_free_inode(struct inode *inode) {
         mutex_unlock(&fsinfo->itree_lock);
         return;
     }
-    struct rb_node *node = rb_find(&fsinfo->inode_tree, 
-            (const void *)(unsigned long) inum, xv6_rb_cmp);
+    struct rb_node *node = rb_find((const void *)(unsigned long) inum, 
+            &fsinfo->inode_tree, xv6_rb_cmp);
     if (likely(node)) {
         rb_erase(node, &fsinfo->inode_tree);
         xv6_assert(node == &xi->rbnode);
@@ -312,7 +318,7 @@ static void xv6_free_inode(struct inode *inode) {
         xv6_warn("Inode %u not found in inode tree during free.", inum);
     }
     mutex_unlock(&fsinfo->itree_lock);
-    kfree(xi);
+	kmem_cache_free(xv6_inode_cachep, xi);
 }
 
 static const struct super_operations xv6_super_ops = {

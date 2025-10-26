@@ -7,7 +7,10 @@
 #include <linux/fs.h>
 #include <linux/fs_context.h>
 #include <linux/fs_parser.h>
+#include <linux/mpage.h>
 #include <linux/rbtree.h>
+#include <linux/pagemap.h>
+#include <linux/slab.h>
 #include <linux/uidgid.h>
 #include <linux/vfs.h>
 #include <asm/atomic.h>
@@ -15,6 +18,8 @@
 
 #include "fs.h"
 #include "fsinfo.h"
+
+static struct kmem_cache *xv6_inode_cachep;
 
 /* +-+ locking routine +-+ */
 
@@ -289,12 +294,25 @@ static struct file_system_type xv6fs_type = {
 #include "file.c"
 #include "super.c"
 
+static void xv6_init_once(void *pt) {
+    struct xv6_inode *xi = pt;
+    inode_init_once(&xi->inode);
+    xi->refcount = 1;
+}
+
 static int __init xv6fs_init(void) {
     xv6_assert((BSIZE % sizeof(struct dinode)) == 0);
     xv6_assert((BSIZE % sizeof(struct dirent)) == 0);
+	xv6_inode_cachep = kmem_cache_create("xv6_cache",
+				sizeof(struct xv6_inode),
+				0, SLAB_RECLAIM_ACCOUNT,
+				xv6_init_once);
+	if (xv6_inode_cachep == NULL)
+		return -ENOMEM;
     return register_filesystem(&xv6fs_type);
 }
 static void __exit xv6fs_exit(void) {
+	kmem_cache_destroy(xv6_inode_cachep);
 	unregister_filesystem(&xv6fs_type);
 }
 module_init(xv6fs_init);
