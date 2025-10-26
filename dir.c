@@ -259,6 +259,8 @@ static int xv6_dir_erase(struct inode *dir, int inum) {
         const int lim = xv6_min(nents, size);
         for (int i = 0; i < lim; i++) {
             if (de[i].inum == __cpu_to_le16(inum)) {
+                /* Poison directory entry. */
+                memset(&de[i], 0xfd, sizeof(*de));
                 de[i].inum = 0;
                 de[i].name[0] = 0;
                 goto derase_found;

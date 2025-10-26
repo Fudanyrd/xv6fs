@@ -156,6 +156,13 @@ static int xv6_balloc(struct super_block *sb, uint *block) {
     return error;
 }
 static int xv6_bfree(struct super_block *sb, uint block) {
+    struct buffer_head *bh = sb_bread(sb, block);
+    if (bh) {
+        xv6_assert(BSIZE == sb->s_blocksize);
+        memset(bh->b_data, 0xfd, sb->s_blocksize);
+        mark_buffer_dirty(bh);
+        (void) sync_dirty_buffer(bh);
+    }
     mutex_lock(xv6_balloc_lock(sb));
     int error = xv6_bfree_unsafe(sb, block);
     mutex_unlock(xv6_balloc_lock(sb));
