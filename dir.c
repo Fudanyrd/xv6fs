@@ -146,6 +146,7 @@ static int xv6_readdir(struct file *dir, struct dir_context *ctx) {
         const struct dirent *de = (const struct dirent *) bh->b_data;
         for (int i = offset; i < nents; i++) {
             if (de[i].inum == 0) {
+                (*cpos) += 1;
                 continue; /* unused entry */
             }
             if (!dir_emit(ctx, de[i].name, strnlen(de[i].name, DIRSIZ),
