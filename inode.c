@@ -453,7 +453,7 @@ static int xv6_create(struct mnt_idmap *idmap, struct inode *dir,
         return -ENAMETOOLONG;
     }
 
-    uint inum, dnum;
+    uint inum;
     struct super_block *sb = dir->i_sb;
     int error = 0;
     struct dinode dino;
@@ -497,25 +497,8 @@ static int xv6_create(struct mnt_idmap *idmap, struct inode *dir,
         goto create_fini;
     }
     
-    error = xv6_dentry_alloc(dir, name, &dnum);
-    if (error) {
-        goto create_fini_unlock;
-    }
-    if (dnum == 0) {
-        error = xv6_dentry_next(dir, &dnum);
-        if (error) {
-            goto create_fini_unlock;
-        }
-        xv6_assert(dnum != 0);
-        if ((error = xv6_sync_inode(dir)) != 0) {
-            goto create_fini_unlock;
-        }
-    }
-    if ((error = xv6_dentry_write(dir, dnum, name, inum)) != 0) {
-        goto create_fini_unlock;
-    }
+    error = xv6_dentry_insert(dir, name, inum);
 
-create_fini_unlock:
 create_fini:
     if (error) {
         iput(newinode);
