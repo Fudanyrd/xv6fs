@@ -240,6 +240,9 @@ static int xv6_link(struct dentry *oldentry, struct inode *dir,
     if (error) {
         return error;
     }
+    if (unlikely(dnum == 0)) {
+        return -EFBIG;
+    }
 
     /* Write directory entry. */
     error = xv6_dentry_write(dir, dnum, name, oldinum);
@@ -253,5 +256,63 @@ static int xv6_link(struct dentry *oldentry, struct inode *dir,
     
     /* Finish. */
     d_instantiate(entry, oldino);
+    return error;
+}
+
+static int xv6_rename (struct mnt_idmap *idmap, struct inode *olddir, 
+            struct dentry *oldentry, struct inode *newdir, 
+            struct dentry *newentry, unsigned int flags) {
+	if (flags & ~RENAME_NOREPLACE) {
+		return -EINVAL;
+    }
+    bool replace = (flags & RENAME_NOREPLACE);
+    int error;
+    uint dnum = 0;
+    const char *oldname = oldentry->d_name.name;
+    const char *newname = newentry->d_name.name;
+    if (strlen(newname) > DIRSIZ) { 
+        error = -ENAMETOOLONG;
+        goto rename_fini;
+    }
+
+    /* Remove the entry in olddir. */
+    error = xv6_dir_erase(olddir, oldname);
+    if (error) {
+        goto rename_fini;
+    }
+
+    /* Test or remove in new entry */
+    error = xv6_find_inum(newdir, newentry, &dnum);
+    if (error) {
+        goto rename_fini;
+    }
+    if (!replace) {
+        if (dnum) {
+            error = -EEXIST;
+            goto rename_fini;
+        }
+    } else {
+        if (dnum) {
+            /* Also erase, for it will be replaced. */
+            if ((error = xv6_dir_erase(newdir, newname)) != 0) {
+                goto rename_fini;
+            }
+        }
+    }
+    if (dnum == 0) {
+        error = xv6_dentry_alloc(newdir, oldname, &dnum);
+        if (error) { goto rename_fini; }
+        if (unlikely(dnum == 0)) {
+            error = -EFBIG;
+            goto rename_fini;
+        }
+    }
+
+    /* Insert oldentry to newdir. */
+    struct inode *oldino = oldentry->d_inode;
+    error = xv6_dentry_write(newdir, dnum, newname, oldino->i_ino);
+    d_instantiate(newentry, oldino);
+
+rename_fini:
     return error;
 }

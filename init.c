@@ -247,6 +247,8 @@ static int xv6_file_flush(struct file *file, fl_owner_t id) {
 static int xv6_unlink(struct inode *dir, struct dentry *entry);
 static int xv6_link(struct dentry *oldentry, struct inode *dir, 
             struct dentry *entry);
+static int xv6_rename (struct mnt_idmap *, struct inode *, struct dentry *,
+                       struct inode *, struct dentry *, unsigned int);
 
 /* +-+ super.c super block operations. +-+ */
 enum {
