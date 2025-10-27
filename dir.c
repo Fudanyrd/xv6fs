@@ -284,9 +284,16 @@ static int xv6_dentry_write(struct inode *dir, uint dnum, const char *name,
 
     struct dirent *de = (struct dirent *) bh->b_data;
     de += dnum % ndents;
-    memset(de->name, 0, DIRSIZ);
-    strncpy(de->name, name, DIRSIZ);
-    de->inum = __cpu_to_le16(inum);
+    if (name != NULL) {
+        memset(de->name, 0, DIRSIZ);
+        strncpy(de->name, name, DIRSIZ);
+        de->inum = __cpu_to_le16(inum);
+    } else {
+        /* Do clear action instead. */
+        memset(de, 0xfd, sizeof(*de));
+        de->inum = 0;
+        de->name[0] = 0;
+    }
     mark_buffer_dirty(bh);
     error = sync_dirty_buffer(bh);
     brelse(bh);

@@ -273,32 +273,30 @@ static int xv6_rename (struct mnt_idmap *idmap, struct inode *olddir,
     if (error) {
         goto rename_fini;
     }
-    if (!replace) {
-        if (dnum) {
+
+    if (dnum) {
+        /* oldentry is found in new directory. */
+        if (!replace) {
             error = -EEXIST;
             goto rename_fini;
-        }
-    } else {
-        if (dnum) {
+        } else {
             /* Also erase, for it will be replaced. */
             if ((error = xv6_dir_erase(newdir, newname)) != 0) {
                 goto rename_fini;
             }
         }
     }
-    if (dnum == 0) {
-        error = xv6_dentry_alloc(newdir, oldname, &dnum);
-        if (error) { goto rename_fini; }
-        if (unlikely(dnum == 0)) {
-            error = -EFBIG;
-            goto rename_fini;
-        }
-    }
 
-    /* Insert oldentry to newdir. */
+    /* 
+     * Now the newentry in newdir is removed, 
+     * can safely insert without check. 
+     */
+    /* Insert oldentry to newdir.  */
     struct inode *oldino = oldentry->d_inode;
-    error = xv6_dentry_write(newdir, dnum, newname, oldino->i_ino);
-    d_instantiate(newentry, oldino);
+    error = xv6_dentry_insert(newdir, newname, oldino->i_ino);
+    if (!error) {
+        d_instantiate(newentry, oldino);
+    }
 
 rename_fini:
     return error;
