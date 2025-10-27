@@ -7,6 +7,7 @@
 
 #include "fs.h"
 #include "fsinfo.h"
+#include "xv6.h"
 
 extern struct dentry *d_splice_alias(struct inode *inode, struct dentry *dentry);
 

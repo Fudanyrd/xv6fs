@@ -1,6 +1,7 @@
 #include <linux/buffer_head.h>
 #include "fs.h"
 #include "fsinfo.h"
+#include "xv6.h"
 
 static int xv6_balloc_rng(struct super_block *sb, uint *block, uint start, 
              uint end);

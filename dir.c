@@ -4,6 +4,7 @@
 
 #include "fs.h"
 #include "fsinfo.h"
+#include "xv6.h"
 
 static inline int xv6_dget(struct inode *dir, struct dinode *dino) {
     struct super_block *xv6_sb = dir->i_sb;

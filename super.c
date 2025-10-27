@@ -5,6 +5,7 @@
 #include <asm/uaccess.h>
 
 #include "fsinfo.h"
+#include "xv6.h"
 
 static int xv6fs_init_fs_ctx(struct fs_context *fc) {
     fc->ops = &xv6fs_context_ops;

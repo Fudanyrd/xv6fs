@@ -3,6 +3,7 @@
 
 #include "fs.h"
 #include "fsinfo.h"
+#include "xv6.h"
 
 static const struct file_operations xv6_file_ops = {
     .owner = THIS_MODULE,
