@@ -150,51 +150,6 @@ insert_fini:
     return error;
 }
 
-static int xv6_dentry_alloc(struct inode *dir, const char *name, uint *num) {
-    const uint nents = BSIZE / sizeof(struct dirent);
-    if ((dir->i_mode & S_IFMT) != S_IFDIR) {
-        /* Not a directory. */
-        return -ENOTDIR;
-    }
-
-    if (*name == '.' && (name[1] == '\0' || 
-            (name[1] == '.' && name[2] == '\0'))) {
-        /* Do not allow creating "." or ".." entries. */
-        return -EEXIST;
-    }
-
-    *num = 0;
-    uint size = dir->i_size;
-    uint block = 0;
-    struct buffer_head *bh = NULL;
-    int error;
-    xv6_assert(size % sizeof(struct dirent) == 0 && "corrupted directory size");
-    size /= sizeof(struct dirent);
-    xv6_assert(size >= 2 && "directory must contain . and .. entries");
-    while ((error = xv6_inode_block(dir, block, &bh)) == 0) {
-        if (bh == NULL) {
-            *num = block * nents;
-            break; /* This is a virtual zeroed block. */
-        }
-        const struct dirent *de = (const struct dirent *) bh->b_data;
-        const int lim = xv6_min(nents, size);
-        for (int i = 0; i < lim; i++) {
-            if (de[i].inum == 0) {
-                *num = block * nents + i;
-                break; /* unused entry */
-            }
-        }
-        brelse(bh);
-        block += 1;
-        size -= lim;
-        if (size == 0) {
-            /* All entries have been checked. */
-            break;
-        }
-    }
-    return error;
-}
-
 static int xv6_readdir(struct file *dir, struct dir_context *ctx) {
     typeof(ctx->pos) *cpos = &ctx->pos;
     struct inode *inode = dir->f_inode;
@@ -247,57 +202,6 @@ static int xv6_readdir(struct file *dir, struct dir_context *ctx) {
     }
 
 readdir_fini:
-    return error;
-}
-
-static int xv6_dentry_next(struct inode *dir, uint *num) {
-    *num = 0;
-    
-    uint size = dir->i_size;
-    const uint ndents = BSIZE / sizeof(struct dirent);
-    xv6_assert(size % sizeof(struct dirent) == 0);
-    size /= sizeof(struct dirent);
-    size += 1;
-    int error = 0;
-
-    struct buffer_head *bh = NULL;
-    error = xv6_inode_wblock(dir, size / ndents, &bh); 
-    if (error) {
-        return error;
-    }
-    brelse(bh);
-    dir-> i_size = size * sizeof(struct dirent);
-    *num = size - 1;
-
-    return 0;
-}
-
-static int xv6_dentry_write(struct inode *dir, uint dnum, const char *name, 
-            uint inum) {
-    const uint ndents = BSIZE / sizeof(struct dirent);
-    struct buffer_head *bh;
-    int error = 0;
-
-    error = xv6_inode_wblock(dir, dnum / ndents, &bh); 
-    if (error) {
-        return error;
-    }
-
-    struct dirent *de = (struct dirent *) bh->b_data;
-    de += dnum % ndents;
-    if (name != NULL) {
-        memset(de->name, 0, DIRSIZ);
-        strncpy(de->name, name, DIRSIZ);
-        de->inum = __cpu_to_le16(inum);
-    } else {
-        /* Do clear action instead. */
-        memset(de, 0xfd, sizeof(*de));
-        de->inum = 0;
-        de->name[0] = 0;
-    }
-    mark_buffer_dirty(bh);
-    error = sync_dirty_buffer(bh);
-    brelse(bh);
     return error;
 }
 

@@ -157,25 +157,11 @@ static inline int xv6_dget(struct inode *dir, struct dinode *dino);
  */
 static int xv6_find_inum(struct inode *dir, struct dentry *entry, uint *inum);
 /**
- * Try to allocate an directory entry in [0, dir->size). If no empty
- * entry, *num is set to 0, and returns 0.
- *
- * @return -EEXIT if name already exists
- */
-static int xv6_dentry_alloc(struct inode *dir, const char *name, uint *num);
-
-/**
  * Insert an entry into directory. It will NOT check if `name` already
  * exists.
  * @throw ENAMETOOLONG if `strlen(name) > DIRSIZ`
  */
 static int xv6_dentry_insert(struct inode *dir, const char *name, uint inum);
-/**
- * Extend directory by one entry, and set *num.
- */
-static int xv6_dentry_next(struct inode *dir, uint *num);
-
-static int xv6_dentry_write(struct inode *dir, uint dnum, const char *name, uint inum);
 static int xv6_dir_init(struct super_block *sb, uint block, 
             uint inum_parent, uint inum_this);
 /*
@@ -208,19 +194,6 @@ static const struct file_operations xv6_directory_ops;
 __attribute__((unused))
 static int xv6_file_block(struct super_block *sb, const struct dinode *file,
             uint i, struct buffer_head **bhptr);
-/**
- * Get the i'th block of file data. If reaches end, allocate 
- * and attach a block; else it's the same as `xv6_file_block`.
- *
- * If disk is full and cannot allocate, returns -ENOSPC, and
- * bhptr is undefined.
- *
- * @param[out] dirty set this bit to whether dinode is modified.
- * @param[out] bhptr the data block
- * @throw -EROFS if filesystem is read-only.
- */
-static int xv6_file_alloc(struct super_block *sb, struct dinode *file,
-            uint i, bool *dirty, struct buffer_head **bhptr);
 #define xv6_lseek  generic_file_llseek
 #define xv6_file_read_iter generic_file_read_iter
 static int xv6_update_time(struct inode *a1, int a2) {
