@@ -193,7 +193,7 @@ static int xv6_unlink(struct inode *dir, struct dentry *entry) {
     inode_dec_link_count(file_ino);
     uint nlink = file_ino->i_nlink;
     if (nlink) {
-        return 0;
+        return xv6_dir_erase(dir, entry->d_name.name);
     }
     xv6_assert(file_inum);
     if (file_inum == ROOTINO) {
@@ -212,9 +212,46 @@ static int xv6_unlink(struct inode *dir, struct dentry *entry) {
     }
 
     /* Next, find it in the directory and remove the entry. */
-    error = xv6_dir_erase(dir, file_inum);
+    error = xv6_dir_erase(dir, entry->d_name.name);
 
     /* Last, safely free the inode in the itable. */
     error = xv6_ifree(sb, file_inum);
+    return error;
+}
+
+static int xv6_link(struct dentry *oldentry, struct inode *dir, 
+            struct dentry *entry) {
+    
+    struct inode *oldino = oldentry->d_inode;
+    uint oldinum = oldino->i_ino;
+    int error ; 
+    const char *name = entry->d_name.name;
+    uint dnum;
+    if (strlen(name) > DIRSIZ) {
+        return -ENAMETOOLONG;
+    }
+    if (unlikely(oldino->i_nlink >= __INT16_MAX__)) {
+        xv6_error("hard links reach limit(%u)", __INT16_MAX__);
+        return -ETOOMANYREFS;
+    }
+
+    /* allocate directory entry. */
+    error = xv6_dentry_alloc(dir, name, &dnum);
+    if (error) {
+        return error;
+    }
+
+    /* Write directory entry. */
+    error = xv6_dentry_write(dir, dnum, name, oldinum);
+    if (error) {
+        return error;
+    }
+
+    /* Increment link count and sync. */
+    inode_inc_link_count(oldino);
+    error = xv6_sync_inode(oldino);
+    
+    /* Finish. */
+    d_instantiate(entry, oldino);
     return error;
 }

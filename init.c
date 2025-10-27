@@ -192,8 +192,11 @@ static int xv6_dir_init(struct super_block *sb, uint block,
 static int xv6_readdir(struct file *dir, struct dir_context *ctx);
 
 static int xv6_unlink(struct inode *dir, struct dentry *entry);
-/* Erase the dentry whose inode number is inum. */
-static int xv6_dir_erase(struct inode *dir, int inum);
+/* 
+ * Erase the dentry whose name is `name`. Should not use inode number,
+ * because of existence of hard link.
+ */
+static int xv6_dir_erase(struct inode *dir, const char *name);
 
 static int xv6_rmdir(struct inode *dir, struct dentry *entry);
 
@@ -242,6 +245,8 @@ static int xv6_file_flush(struct file *file, fl_owner_t id) {
     return xv6_write_inode(file->f_inode, NULL);
 }
 static int xv6_unlink(struct inode *dir, struct dentry *entry);
+static int xv6_link(struct dentry *oldentry, struct inode *dir, 
+            struct dentry *entry);
 
 /* +-+ super.c super block operations. +-+ */
 enum {

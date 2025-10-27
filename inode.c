@@ -610,6 +610,7 @@ static const struct inode_operations xv6_inode_ops = {
     .setattr = xv6_setattr,
     .mkdir = xv6_mkdir,
     .rmdir = xv6_rmdir,
+    .link = xv6_link,
     .unlink = xv6_unlink,
 };
 

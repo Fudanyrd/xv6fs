@@ -242,7 +242,7 @@ static int xv6_dir_init(struct super_block *sb, uint block,
     return error;
 }
 
-static int xv6_dir_erase(struct inode *dir, int inum) {
+static int xv6_dir_erase(struct inode *dir, const char *name) {
     const int nents = BSIZE / sizeof(struct dirent);
     uint size = dir->i_size;
     int error;
@@ -259,7 +259,7 @@ static int xv6_dir_erase(struct inode *dir, int inum) {
         struct dirent *de = (struct dirent *) bh->b_data;
         const int lim = xv6_min(nents, size);
         for (int i = 0; i < lim; i++) {
-            if (de[i].inum == __cpu_to_le16(inum)) {
+            if (strncmp(name, de[i].name, DIRSIZ) == 0) {
                 /* Poison directory entry. */
                 memset(&de[i], 0xfd, sizeof(*de));
                 de[i].inum = 0;
