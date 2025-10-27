@@ -104,7 +104,9 @@ static int xv6_dentry_insert(struct inode *dir, const char *name, uint inum) {
                 break; /* unused entry */
             }
         }
+        if (dnum != 0) { break; }
         brelse(bh);
+        bh = NULL;
         block += 1;
         size -= lim;
         if (size == 0) {
@@ -142,6 +144,7 @@ insert_found:
     mark_buffer_dirty(bh);
     error = sync_dirty_buffer(bh);
     brelse(bh);
+    bh = NULL;
 insert_fini:
     return error;
 }

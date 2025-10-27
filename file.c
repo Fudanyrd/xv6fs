@@ -226,26 +226,13 @@ static int xv6_link(struct dentry *oldentry, struct inode *dir,
     uint oldinum = oldino->i_ino;
     int error ; 
     const char *name = entry->d_name.name;
-    uint dnum;
-    if (strlen(name) > DIRSIZ) {
-        return -ENAMETOOLONG;
-    }
     if (unlikely(oldino->i_nlink >= __INT16_MAX__)) {
         xv6_error("hard links reach limit(%u)", __INT16_MAX__);
         return -ETOOMANYREFS;
     }
 
     /* allocate directory entry. */
-    error = xv6_dentry_alloc(dir, name, &dnum);
-    if (error) {
-        return error;
-    }
-    if (unlikely(dnum == 0)) {
-        return -EFBIG;
-    }
-
-    /* Write directory entry. */
-    error = xv6_dentry_write(dir, dnum, name, oldinum);
+    error = xv6_dentry_insert(dir, name, oldinum);
     if (error) {
         return error;
     }

@@ -178,9 +178,10 @@ static int xv6_find_inum(struct inode *dir, struct dentry *entry, uint *inum);
  */
 static int xv6_dentry_alloc(struct inode *dir, const char *name, uint *num);
 
-/*
+/**
  * Insert an entry into directory. It will NOT check if `name` already
  * exists.
+ * @throw ENAMETOOLONG if `strlen(name) > DIRSIZ`
  */
 static int xv6_dentry_insert(struct inode *dir, const char *name, uint inum);
 /**
