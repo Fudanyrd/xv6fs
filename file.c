@@ -253,7 +253,8 @@ static int xv6_rename (struct mnt_idmap *idmap, struct inode *olddir,
 	if (flags & ~RENAME_NOREPLACE) {
 		return -EINVAL;
     }
-    bool replace = (flags & RENAME_NOREPLACE);
+    __attribute__((unused))
+    bool replace = !(flags & RENAME_NOREPLACE);
     int error;
     uint dnum = 0;
     const char *oldname = oldentry->d_name.name;
@@ -277,15 +278,7 @@ static int xv6_rename (struct mnt_idmap *idmap, struct inode *olddir,
 
     if (dnum) {
         /* oldentry is found in new directory. */
-        if (!replace) {
-            error = -EEXIST;
-            goto rename_fini;
-        } else {
-            /* Also erase, for it will be replaced. */
-            if ((error = xv6_dir_erase(newdir, newname)) != 0) {
-                goto rename_fini;
-            }
-        }
+        return -EEXIST;
     }
 
     /* 
