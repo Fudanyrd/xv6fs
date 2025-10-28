@@ -49,6 +49,28 @@ static struct file_system_type xv6fs_type = {
 #include "file.c"
 #include "super.c"
 
+static void checker_printk(const char *fmt, ...) {
+    va_list vl;
+    va_start(vl, fmt);
+    vprintk(fmt, vl);
+    va_end(vl);
+}
+
+static void *checker_bread(void *privat, uint block) {
+    struct super_block *sb = privat;
+    return sb_bread(sb, block);
+}
+
+static void *checker_data(void *buffer) {
+    struct buffer_head *bh = buffer;
+    return bh->b_data;
+}
+
+static void checker_bfree(void *buffer) {
+    struct buffer_head *bh = buffer;
+    brelse(bh);
+}
+
 static void xv6_init_once(void *pt) {
     struct xv6_inode *xi = pt;
     inode_init_once(&xi->inode);

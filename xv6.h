@@ -6,6 +6,7 @@
 #include <linux/fs.h>
 
 #include "fs.h"
+#include "check.h"
 
 /* +-+ locking routine +-+ */
 
@@ -253,5 +254,19 @@ static int xv6_reconfigure(struct fs_context *fc);
 static void xv6_free_fc(struct fs_context *fc);
 static const struct super_operations xv6_super_ops;
 static void xv6_kill_block_super(struct super_block *sb);
+
+/* +-+ init.c +-+ */
+
+/* For checker::warning and checker::error */
+static void checker_printk(const char *fmt, ...);
+
+/* For checker::bread */
+static void *checker_bread(void *privat, uint block);
+
+/* For checker::bdata */
+static void *checker_data(void *buffer);
+
+/* For checker::bfree */
+static void checker_bfree(void *buffer);
 
 #endif /* _XV6_H 1 */

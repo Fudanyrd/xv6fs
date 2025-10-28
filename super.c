@@ -110,6 +110,25 @@ static int xv6_fill_super(struct super_block *sb, struct fs_context *fc) {
      * should be marked 1 in the bitmap, because they cannot be allocated for file 
      * or directory. 
      */
+    do {
+        struct checker checker = {
+            .bread = checker_bread,
+            .bfree = checker_bfree,
+            .bdata = checker_data,
+            .warning = checker_printk,
+            .error = checker_printk,
+            .privat = sb,
+            .err = KERN_ERR "xv6: " "\033[01;31merror:\033[0;m",
+            .warn = KERN_WARNING "xv6: " "\033[01;35merror:\033[0;m",
+        };
+
+        if (xv6_docheck(&checker) != 0) {
+            xv6_error("checker reported errors. abort");
+            goto out_fail;
+        }
+
+    } while (0);
+
 
     /* Read root directory. */
     root_dir = xv6_find_inode(sb, ROOTINO, NULL);
