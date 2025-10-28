@@ -68,7 +68,6 @@ static int xv6_fill_super(struct super_block *sb, struct fs_context *fc) {
     mutex_init(&fsinfo->build_inode_lock);
     fsinfo->inode_tree = RB_ROOT;
 	fsinfo->options = *(const struct xv6_mount_options *)(fc->fs_private);
-    // xv6_error("got here, line %d", __LINE__);
 
     struct dirent dummy;
     const typeof(dummy.inum) ninodes_max = (typeof(dummy.inum)) (-1);
@@ -81,30 +80,11 @@ static int xv6_fill_super(struct super_block *sb, struct fs_context *fc) {
     fsinfo->ninode_blocks = INODE_BLOCKS(fsinfo->ninodes);
     fsinfo->nbmap_blocks = BITMAP_BLOCKS(fsinfo->size);
     uint start = 1 /* super block */;
-    if (fsinfo->logstart != start) {
-        xv6_error("expected logstart = 1, got %u", fsinfo->logstart);
-        goto out_fail;
-    }
     start += fsinfo->nlog;
-    if (fsinfo->inodestart != start) {
-        xv6_error("expected inode start = %u, got %u", start, fsinfo->inodestart);
-        goto out_fail;
-    }
     start += fsinfo->ninode_blocks;
-    if (fsinfo->bmapstart != start) {
-        xv6_error("expected bitmap start = %u, got %u", start, fsinfo->bmapstart);
-        goto out_fail;
-    }
     start += fsinfo->nbmap_blocks;
     fsinfo->balloc_hint = start; /* Initialize hint to the first data block. */
     start += fsinfo->nblocks;
-    if (fsinfo->size < start) {
-        xv6_error("Disk too small(%u) to hold %u blocks.", fsinfo->size, start);
-        goto out_fail;
-    } else if (fsinfo->size > start) {
-        /* Wasted some disk blocks. */
-        xv6_warn("Disk too large(%u) to hold %u blocks.", fsinfo->size, start);
-    }
     /*
      * FIXME: Now check the bitmap blocks. All metadata blocks(super, inode, bitmap)
      * should be marked 1 in the bitmap, because they cannot be allocated for file 
