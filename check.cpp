@@ -35,7 +35,7 @@ static uint xuint(uint x) {
 }
 
 
-int xv6_docheck(struct checker *check) {
+int xv6_docheck(struct checker *check) noexcept {
     if (!check->bread || !check->bdata) {
         return 1;
     }

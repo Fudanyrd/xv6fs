@@ -13,4 +13,9 @@ reference.c
 *.img
 mkxv6
 mnt/
+*.out
+*.s
+*.asm
+*.ll
+check
 

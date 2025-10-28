@@ -20,7 +20,7 @@ struct checker {
 };
 
 /** Run the xv6 filesystem checker. */
-extern int xv6_docheck(struct checker *check);
+extern int xv6_docheck(struct checker *check) __attribute__((nothrow));
 
 #ifdef __cplusplus
 }
