@@ -3,6 +3,7 @@ fat
 *.cmd
 *.swp
 *.o
+*.a
 *.mod
 *.log
 *.ko
