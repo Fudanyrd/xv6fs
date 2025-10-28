@@ -8,7 +8,9 @@ extern "C" {
 #endif /* C++ */
 
 struct checker {
-    void *(* bread)(uint); /**< Read a disk block, return the buffer struct. */
+    void *privat;  /**< Private struct needed to read blocks
+                     Don't ask me why I misspelled it 😭 */
+    void *(* bread)(void *, uint); /**< Read a disk block, return the buffer struct. */
     void *(* bdata)(void *); /**< Given the buffer, get its internal data. */
     void (*bfree)(void *); /**< Free an buffer. */
 

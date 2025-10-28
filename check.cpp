@@ -130,8 +130,9 @@ int xv6_docheck(struct checker *check) noexcept {
     }} while (0)
 
     struct superblock sb;
+    void *const privat = check->privat;
     do {
-        struct bufptr sbptr(check->bread(0), check);
+        struct bufptr sbptr(check->bread(privat, 0), check);
         onnull(sbptr.buf_, check->bread);
         sb = *(struct superblock *) sbptr.data();
     } while (0);

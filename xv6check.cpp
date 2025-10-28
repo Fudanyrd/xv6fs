@@ -24,7 +24,6 @@ static void xv6_message(const char *fmt, ...) {
     va_end(va);
 }
 
-static void *fmap;
 static size_t fsize;
 static size_t mapsize;
 
@@ -38,12 +37,12 @@ struct mapptr {
     size_t map_size_;
 };
 
-static void *checker_bread(uint block) {
+static void *checker_bread(void *privat, uint block) {
     if (block >= fsize / BSIZE) {
         /* Attempting out-of-bound access. */
         return nullptr;
     }
-    uintptr_t addr = (uintptr_t) fmap;
+    uintptr_t addr = (uintptr_t) privat;
     return (void *)(addr + (block * BSIZE));
 }
 
@@ -74,7 +73,7 @@ int main(int argc, char **argv) {
         mapsize = fsize + 4095;
         mapsize = mapsize & (~((size_t) 4095));
     } while (0);
-    fmap = mmap(NULL, mapsize, PROT_READ, MAP_PRIVATE, fd, 0);
+    void *fmap = mmap(NULL, mapsize, PROT_READ, MAP_PRIVATE, fd, 0);
     close(fd);
     if (fmap == MAP_FAILED) {
         perror("mmap");
@@ -84,6 +83,7 @@ int main(int argc, char **argv) {
 
     struct checker check;
     check.err = nullptr;
+    check.privat = fmap;
     check.warn = nullptr;
     check.warning  = check.error = xv6_message;
     check.bdata = checker_bdata;
