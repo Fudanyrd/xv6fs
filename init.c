@@ -20,6 +20,9 @@
 #include "fsinfo.h"
 
 #include "xv6.h"
+#include "check.h"
+
+EXPORT_SYMBOL_GPL(xv6_docheck);
 
 static struct kmem_cache *xv6_inode_cachep;
 
