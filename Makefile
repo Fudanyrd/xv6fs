@@ -20,7 +20,7 @@ clean:
 	$(MAKE) -C $(BUILDSYSTEM_DIR) M=$(PWD) clean && rm -f mkxv6 check
 endif
 
-CXXFLAGS = -O2 -g
+CXXFLAGS = -O2 -g -Wall -Werror
 ALLCXXFLAGS = $(CXXFLAGS) -fno-pie
 
 mkxv6: mkxv6.c Makefile fs.h
