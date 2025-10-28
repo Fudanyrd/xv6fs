@@ -3,6 +3,10 @@
 #define _FS_H 1
 #include "common.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* C++ */
+
 // Copied from github.com/mit-pdos/xv6-riscv/kernel/stat.h
 #define T_DIR     1   // Directory
 #define T_FILE    2   // File
@@ -75,6 +79,10 @@ struct dirent {
   ushort inum;
   char name[DIRSIZ] __attribute__((nonstring));
 } __attribute__((packed));
+
+#ifdef __cplusplus
+}
+#endif /* C++ */
 
 #endif // _FS_H
 
