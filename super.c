@@ -48,13 +48,6 @@ static int xv6_fill_super(struct super_block *sb, struct fs_context *fc) {
         goto out_fail;
     }
     const struct superblock *xv6_sb = (const struct superblock *) bh->b_data;
-    if (__le32_to_cpu(xv6_sb->magic) != FSMAGIC) {
-        /* Not a xv6 filesystem. */
-        error = -EINVAL;
-        xv6_error("Bad magic number: 0x%x", 
-            __le32_to_cpu(xv6_sb->magic));
-        goto out_fail;
-    }
     fsinfo->size = __le32_to_cpu(xv6_sb->size);
     fsinfo->nblocks = __le32_to_cpu(xv6_sb->nblocks);
     fsinfo->ninodes = __le32_to_cpu(xv6_sb->ninodes);
