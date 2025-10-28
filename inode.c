@@ -124,9 +124,10 @@ static struct dentry *xv6_lookup(struct inode *dir, struct dentry *dentry,
     struct super_block *sb = dir->i_sb;
 	struct inode *inode = NULL;
 
-    uint inum = 0;
-    int reason = xv6_find_inum(dir, dentry, &inum);
-    if (!inum) {
+    uint dnum = 0;
+    struct dirent de;
+    int reason = xv6_find_inum(dir, dentry->d_name.name, &dnum, &de);
+    if (!dnum) {
         /* Not found. Like vfat_lookup, should return null. */
         return NULL;
     } else if (reason) {
@@ -134,6 +135,8 @@ static struct dentry *xv6_lookup(struct inode *dir, struct dentry *dentry,
         inode = ERR_PTR(reason);
     } else {
         /* Load the inode from disk (may fail) */
+        uint inum = __le16_to_cpu(de.inum);
+        xv6_assert(inum != 0 && "should not get null inode");
         inode = xv6_iget(sb, inum);
     }
 

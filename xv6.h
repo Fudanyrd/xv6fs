@@ -153,9 +153,12 @@ static inline int xv6_dget(struct inode *dir, struct dinode *dino);
  * If no error occurred in reading the dir, but entry is not found,
  * this fill set `inum' to 0.
  *
+ * @param[out] de if found, copies the directory entry.
+ * @param[out] dnum the position of the found entry.
  * @return 0 on success; `reason' on error.
  */
-static int xv6_find_inum(struct inode *dir, struct dentry *entry, uint *inum);
+static int xv6_find_inum(struct inode *dir, const char *name, uint *dnum,
+            struct dirent *de);
 /**
  * Insert an entry into directory. It will NOT check if `name` already
  * exists.
@@ -177,7 +180,8 @@ static int xv6_unlink(struct inode *dir, struct dentry *entry);
 static int xv6_dir_erase(struct inode *dir, const char *name);
 
 static int xv6_rmdir(struct inode *dir, struct dentry *entry);
-
+static int xv6_dentry_write(struct inode *dir, uint dnum, const char *name, 
+            uint inum);
 /* 
  * +-+ file.c: file read/write operations. 
  * (directory is organized much like a file) 

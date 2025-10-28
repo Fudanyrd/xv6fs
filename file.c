@@ -271,7 +271,8 @@ static int xv6_rename (struct mnt_idmap *idmap, struct inode *olddir,
     }
 
     /* Test or remove in new entry */
-    error = xv6_find_inum(newdir, newentry, &dnum);
+    struct dirent dummy;
+    error = xv6_find_inum(newdir, newentry->d_name.name, &dnum, &dummy);
     if (error) {
         goto rename_fini;
     }

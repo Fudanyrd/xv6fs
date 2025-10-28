@@ -26,7 +26,8 @@ static inline int xv6_dget(struct inode *dir, struct dinode *dino) {
     return 0;
 }
 
-static int xv6_find_inum(struct inode *dir, struct dentry *entry, uint *inum) {
+static int xv6_find_inum(struct inode *dir, const char *name, uint *dnum,
+            struct dirent *dout) {
     if ((dir->i_mode & S_IFMT) != S_IFDIR) {
         /* Not a directory. */
         return -ENOTDIR;
@@ -38,7 +39,7 @@ static int xv6_find_inum(struct inode *dir, struct dentry *entry, uint *inum) {
     xv6_assert(size % sizeof(struct dirent) == 0 && "corrupted directory size");
     size /= sizeof(struct dirent);
     xv6_assert(size >= 2 && "directory must contain . and .. entries");
-    *inum = 0;
+    *dnum = 0;
     struct buffer_head *bh = NULL;
     uint block = 0;
     while ((error = xv6_inode_block(dir, block, &bh)) == 0) {
@@ -51,8 +52,9 @@ static int xv6_find_inum(struct inode *dir, struct dentry *entry, uint *inum) {
             if (de[i].inum == 0) {
                 continue; /* unused entry */
             }
-            if (strncmp(entry->d_name.name, de[i].name, DIRSIZ) == 0) {
-                *inum = __le16_to_cpu(de[i].inum);
+            if (strncmp(name, de[i].name, DIRSIZ) == 0) {
+                *dnum = block * nents + i;
+                memcpy(dout, &de[i], sizeof(*dout));
                 brelse(bh);
                 return 0;
             }
@@ -238,49 +240,22 @@ static int xv6_dir_init(struct super_block *sb, uint block,
 }
 
 static int xv6_dir_erase(struct inode *dir, const char *name) {
-    const int nents = BSIZE / sizeof(struct dirent);
     uint size = dir->i_size;
     int error;
     xv6_assert(size % sizeof(struct dirent) == 0 && "corrupted directory size");
     size /= sizeof(struct dirent);
     xv6_assert(size >= 2 && "directory must contain . and .. entries");
-    struct buffer_head *bh = NULL;
-    uint block = 0;
 
-    while ((error = xv6_inode_block(dir, block, &bh)) == 0) {
-        if (bh == NULL) {
-            continue; /* This is a virtual zeroed block. Ignore */
-        }
-        struct dirent *de = (struct dirent *) bh->b_data;
-        const int lim = xv6_min(nents, size);
-        for (int i = 0; i < lim; i++) {
-            if (strncmp(name, de[i].name, DIRSIZ) == 0) {
-                /* Poison directory entry. */
-                memset(&de[i], 0xfd, sizeof(*de));
-                de[i].inum = 0;
-                de[i].name[0] = 0;
-                goto derase_found;
-            }
-        }
-        brelse(bh);
-        block += 1;
-        size -= lim;
-        if (size == 0) {
-            break;
-        }
+    uint dnum = 0;
+    struct dirent de;
+    error = xv6_find_inum(dir, name, &dnum, &de);
+    if (error) {
+        return error;
     }
-
-    if (!error) {
-        /* Not found. */
-        error = -ENOENT;
+    if (dnum == 0) {
+        return -ENOENT;
     }
-    return error;
-
-derase_found:
-    mark_buffer_dirty(bh);
-    error = sync_dirty_buffer(bh);
-    brelse(bh);
-    return error;
+    return xv6_dentry_write(dir, dnum, NULL, 0);
 }
 
 /* Test whether this directory can be safely removed. */
@@ -339,4 +314,33 @@ static int xv6_rmdir(struct inode *dir, struct dentry *entry) {
     }
 
     return xv6_unlink(dir, entry);
+}
+
+static int xv6_dentry_write(struct inode *dir, uint dnum, const char *name, 
+            uint inum) {
+    const uint ndents = BSIZE / sizeof(struct dirent);
+    struct buffer_head *bh;
+    int error = 0;
+
+    error = xv6_inode_wblock(dir, dnum / ndents, &bh); 
+    if (error) {
+        return error;
+    }
+
+    struct dirent *de = (struct dirent *) bh->b_data;
+    de += dnum % ndents;
+    if (name != NULL) {
+        memset(de->name, 0, DIRSIZ);
+        strncpy(de->name, name, DIRSIZ);
+        de->inum = __cpu_to_le16(inum);
+    } else {
+        /* Do clear action instead. */
+        memset(de, 0xfd, sizeof(*de));
+        de->inum = 0;
+        de->name[0] = 0;
+    }
+    mark_buffer_dirty(bh);
+    error = sync_dirty_buffer(bh);
+    brelse(bh);
+    return error;
 }
