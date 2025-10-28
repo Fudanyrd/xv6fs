@@ -126,6 +126,7 @@ int xv6_docheck(struct checker *check) noexcept {
 #define onnull(pt, method) do {                                               \
     if (pt == nullptr) {                                                      \
         check->error("%s %s returned null. aborting\n", check->err, #method); \
+        return 2;                                                             \
     }} while (0)
 
     struct superblock sb;
