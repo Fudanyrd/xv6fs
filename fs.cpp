@@ -97,7 +97,7 @@ int xv6_dir_iterate(struct checker *check,
     int error;
     uint blockno;
     while ((error = xv6_inode_addr(check, dir, i, &blockno, alloc)) == 0) {
-        const uint lim = xv6_min(nents - off, size);
+        const uint lim = xv6_min(nents, size + off);
         if (blockno == 0) {
             uchar dummy[sizeof(struct dirent)] = {0};
             /* Most callback relies on it only called once. */
@@ -130,7 +130,7 @@ int xv6_dir_iterate(struct checker *check,
 
         if (!act.cont || error) { break; }
         i++;
-        size -= lim;
+        size -= (lim - off);
         off = 0;
         if (!size) { break;}
     }
