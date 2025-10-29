@@ -169,7 +169,7 @@ int xv6_docheck(struct checker *check) noexcept {
             .dirty = false,
         };
 
-        if (xv6_dir_iterate(check, &rc, dir_check, check, false) != 0) {
+        if (xv6_dir_iterate(check, &rc, dir_check, check, 2, false) != 0) {
             check->error("%s iterating root directory failed.\n", check->err);
             return 1;
         }

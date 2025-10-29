@@ -18,7 +18,7 @@ static const struct checker modcheck = {
     .error = checker_printk,
     .privat = NULL, /* Set it to the superblock. */
     .err = KERN_ERR "xv6: " "\033[01;31merror:\033[0;m",
-    .warn = KERN_WARNING "xv6: " "\033[01;35merror:\033[0;m",
+    .warn = KERN_WARNING "xv6: " "\033[01;35mwarning:\033[0;m",
     .panic = panic,
 };
 

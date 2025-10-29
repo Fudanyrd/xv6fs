@@ -5,6 +5,7 @@
 #include "fs.h"
 #include "fsinfo.h"
 #include "xv6.h"
+#include "xv6c++.h"
 
 static inline int xv6_dget(struct inode *dir, struct dinode *dino) {
     struct super_block *xv6_sb = dir->i_sb;
@@ -152,10 +153,31 @@ insert_fini:
     return error;
 }
 
+static struct xv6_diter_action readdir_callback(uint dnum, struct dirent *de,
+            void *ctx) {
+    struct xv6_diter_action next = xv6_diter_action_init;
+    next.cont = 1;
+
+    struct dir_context *dc = ctx;
+    if (dnum < dc->pos) {
+        return next;
+    }
+    /* else dnum >= dc->pos */
+    bool cont;
+    if (de->inum == 0) {
+        /* Empty entry */
+        cont = true;
+    } else {
+        cont = dir_emit(ctx, de->name, strnlen(de->name, DIRSIZ),
+                    __le16_to_cpu(de->inum), DT_UNKNOWN);
+    }
+    dc->pos = dnum + (int)cont;
+    next.cont = cont;
+    return next;
+}
+
 static int xv6_readdir(struct file *dir, struct dir_context *ctx) {
-    typeof(ctx->pos) *cpos = &ctx->pos;
     struct inode *inode = dir->f_inode;
-    int error;
 
     /*
      * You should really understand the VFS's locking protocols,
@@ -167,44 +189,20 @@ static int xv6_readdir(struct file *dir, struct dir_context *ctx) {
      */
     
     if ((inode->i_mode & S_IFMT) != S_IFDIR) {
-        error = -ENOTDIR;
-        goto readdir_fini;
+        return -ENOTDIR;
     }
 
-    uint size = inode->i_size;
-    xv6_assert(size % sizeof(struct dirent) == 0 && "corrupted directory size");
-    size /= sizeof(struct dirent);
-
-    uint block = *cpos / (BSIZE / sizeof(struct dirent));
-    uint offset = *cpos % (BSIZE / sizeof(struct dirent));
-    const int nents = BSIZE / sizeof(struct dirent);
-
-    struct buffer_head *bh = NULL;
-    while ((error = xv6_inode_block(inode, block, &bh)) == 0) {
-        if (bh == NULL) {
-            break;
-        }
-        const struct dirent *de = (const struct dirent *) bh->b_data;
-        for (int i = offset; i < nents; i++) {
-            if (de[i].inum == 0) {
-                (*cpos) += 1;
-                continue; /* unused entry */
-            }
-            if (!dir_emit(ctx, de[i].name, strnlen(de[i].name, DIRSIZ),
-                        __le16_to_cpu(de[i].inum), DT_UNKNOWN)) {
-                brelse(bh);
-                goto readdir_fini;
-            }
-            (*cpos) += 1;
-        }
-        brelse(bh);
-        bh = NULL;
-        block += 1;
-        offset = 0;
+    struct super_block *sb = inode->i_sb;
+    struct xv6_fs_info *fsinfo = sb->s_fs_info;
+    struct xv6_inode_ctx ictx = xv6_inode_ctx_init(inode);
+    int error;
+    struct dinode di;
+    if ((error = xv6_init_ictx(&ictx, inode, &di)) != 0) {
+        return error;
     }
-
-readdir_fini:
-    return error;
+    int ret = xv6_dir_iterate(&fsinfo->check, &ictx, readdir_callback, ctx, 
+                    ctx->pos, false);
+    return ret;
 }
 
 static int xv6_dir_init(struct super_block *sb, uint block, 
@@ -343,4 +341,23 @@ static int xv6_dentry_write(struct inode *dir, uint dnum, const char *name,
     error = sync_dirty_buffer(bh);
     brelse(bh);
     return error;
+}
+
+static int xv6_init_ictx(struct xv6_inode_ctx *ictx, struct inode *inode, 
+                struct dinode *di) {
+    if (likely(inode->i_private)) {
+        struct xv6_inode_info *ii = inode->i_private;
+        ictx->addrs = ii->addrs;
+    } else {
+        int error;
+        if ((error = xv6_dget(inode, di)) != 0) {
+            return error;
+        }
+        uint *addrs = di->addrs;
+        for (int i = 0; i <= NDIRECT; i++) {
+            addrs[i] = __le32_to_cpu(addrs[i]);
+        }
+        ictx->addrs = addrs;
+    }
+    return 0;
 }

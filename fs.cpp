@@ -71,6 +71,7 @@ int xv6_dir_iterate(struct checker *check,
             struct xv6_inode_ctx *dir, 
             xv6_diter_callback callback, /* iteration callback. */
             void *ctx /* context should be passed to callback. */,
+            uint off, /* offset in entries. */
             bool rw) {
     auto size = dir->size;
     if (size % sizeof(struct dirent) != 0 || size < 2 * sizeof(struct dirent)) {
@@ -79,13 +80,20 @@ int xv6_dir_iterate(struct checker *check,
     const uint nents = BSIZE / sizeof(struct dirent);
     size /= sizeof(struct dirent);
 
+    if (off > size) {
+        /* Reached the end. should check to avoid underflow */
+        return 0;
+    }
+    size -= off;
+
     bool alloc = rw /* read-write enabled. */;
-    uint i = 0;
+    uint i = off / nents;
+    off = off % nents;
     struct xv6_diter_action act = xv6_diter_action_init;
     int error;
     uint blockno;
     while ((error = xv6_inode_addr(check, dir, i, &blockno, alloc)) == 0) {
-        const uint lim = xv6_min(nents, size);
+        const uint lim = xv6_min(nents - off, size);
         if (blockno == 0) {
             uchar dummy[sizeof(struct dirent)] = {0};
             /* Most callback relies on it only called once. */
@@ -100,7 +108,7 @@ int xv6_dir_iterate(struct checker *check,
             struct bufptr debuf (check->bread(check->privat, blockno), check);
             struct dirent *deptr = (struct dirent *) debuf.data();
             bool flush = false;
-            for (uint k = 0; k < lim; k++) {
+            for (uint k = off; k < lim; k++) {
                 act = callback(i * nents + k, &deptr[k], ctx);
                 flush |= act.de_dirty;
                 if (!act.cont) {
@@ -115,6 +123,7 @@ int xv6_dir_iterate(struct checker *check,
         if (!act.cont || error) { break; }
         i++;
         size -= lim;
+        off = 0;
         if (!size) { break;}
     }
 

@@ -14,7 +14,7 @@ struct xv6_inode_ctx {
     bool dirty;   /**< Is the inode dirty? */
 };
 
-#ifndef _LINUX_FS_H
+#ifdef _LINUX_FS_H
 struct inode;
 #define xv6_inode_ctx_init(ino)        \
     {                                  \
@@ -62,6 +62,7 @@ int xv6_dir_iterate(struct checker *check,
             struct xv6_inode_ctx *dir, 
             xv6_diter_callback callback, /* iteration callback. */
             void *ctx /* context should be passed to callback. */,
+            uint off, /* offset, avoid slow readdir. */
             bool alloc);
 
 /**
@@ -83,7 +84,7 @@ static inline ushort _cpp_to_cpu16(ushort a) {
 #define __le16_to_cpu(x) (_cpp_to_cpu16(x))
 #endif /* __le16_to_cpu */
 #ifndef __le32_to_cpu
-static inline ushort _cpp_to_cpu32(uint a) {
+static inline uint _cpp_to_cpu32(uint a) {
     uint b = 0;
     uchar *src = (uchar *) &a;
     b |= src[0];

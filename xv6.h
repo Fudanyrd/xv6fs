@@ -221,6 +221,10 @@ static int xv6_link(struct dentry *oldentry, struct inode *dir,
 static int xv6_rename (struct mnt_idmap *, struct inode *, struct dentry *,
                        struct inode *, struct dentry *, unsigned int);
 
+struct xv6_inode_ctx;
+static int xv6_init_ictx(struct xv6_inode_ctx *, struct inode *, 
+                struct dinode *);
+
 /* +-+ super.c super block operations. +-+ */
 enum {
     XV6_UID = 1,
