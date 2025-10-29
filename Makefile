@@ -5,11 +5,12 @@ TARGET_MODULE := xv6fs
 ifneq ($(KERNELRELEASE),)
 	$(TARGET_MODULE)-objs := init.o
 	$(TARGET_MODULE)-objs += check.o
+	$(TARGET_MODULE)-objs += fs.o
 	obj-m := $(TARGET_MODULE).o
 
 # If we running without kernel build system
 else
-	BUILDSYSTEM_DIR := /home/liuyu/Desktop/linux-6.17.3
+	BUILDSYSTEM_DIR := /home/yrd/linux-6.17.5
 	PWD:=$(shell pwd)
 
 # run kernel build system to make module
@@ -39,9 +40,18 @@ mkxv6: mkxv6.c Makefile fs.h
 .check.o.cmd:
 	@echo ' GEN     ' .check.o.cmd && echo > .check.o.cmd
 
-# check.o may be linked into kernel module. must compile in freestanding.
-check.o: check.cpp Makefile check.h fs.h common.h .check.o.cmd
-	@echo ' CXX [M] ' check.o && $(CXX) -c check.cpp -o check.o $(CXXKFLAGS) $(ALLCXXFLAGS)
+include .fs.o.d
+include .check.o.d
 
-check: check.o xv6check.cpp
-	@echo ' CXX     ' check && $(CXX) -static -fno-pie xv6check.cpp check.o $(ALLCXXFLAGS) -o check
+# check.o may be linked into kernel module. must compile in freestanding.
+check.o .check.o.d: Makefile
+	@echo ' CXX [M] ' check.o && $(CXX) -c check.cpp -o check.o $(CXXKFLAGS) $(ALLCXXFLAGS) \
+	-MD -MF .check.o.d
+
+check: check.o xv6check.cpp fs.o
+	@echo ' CXX     ' check && $(CXX) -static -fno-pie xv6check.cpp fs.o check.o $(ALLCXXFLAGS) -o check
+
+
+fs.o .fs.o.d: Makefile
+	@echo ' CXX [M] ' fs.o && $(CXX) -c fs.cpp -o fs.o -MD -MF .fs.o.d \
+	$(CXXKFLAGS) $(ALLCXXFLAGS) -include /usr/include/errno.h

@@ -1,4 +1,4 @@
-
+#include "xv6c++.h"
 #include "check.h"
 
 struct xv6_checker_info {
@@ -14,27 +14,6 @@ struct xv6_checker_info {
 
     xv6_checker_info() = default;
     ~xv6_checker_info() = default;
-};
-
-/* Buffer pointer manager; automatic free when dropped. */
-struct bufptr {
-    bufptr(void *buf, struct checker *ctx): buf_(buf), ctx_(ctx) {}
-    
-    /* Disallow copy. */
-    bufptr(const bufptr &other) = delete;
-    bufptr &operator=(const bufptr &other) = delete;
-
-    ~bufptr() {
-        if (this->buf_)
-            ctx_->brelse(this->buf_);
-    }
-
-    void *data() {
-        return ctx_->bdata(this->buf_);
-    }
-
-    void *buf_;
-    struct checker *ctx_;
 };
 
 /* Little-endian to CPU. */
@@ -149,6 +128,52 @@ int xv6_docheck(struct checker *check) noexcept {
         check->error("%s possibly corrupted super block, aborting\n", check->err);
         return 1;
     }
+
+    /* Check root directory. */
+    struct dinode root;
+    do {
+        struct bufptr bp(check->bread(privat, info.inodestart), check);
+        onnull(bp.buf_, check->bread);
+        struct dinode *dino = reinterpret_cast<struct dinode *>(bp.data());
+        root = *(dino + 1);
+        if (dino->type != 0) {
+            check->error("%s null inode should be zeroed", check->err);
+            return 1;
+        }
+        ushort rt = __le16_to_cpu(root.type);
+        if (rt != T_DIR) {
+            check->error("%s root directory has incorrect type %u\n");
+            return 1;
+        }
+    } while (0);
+    /* Directory entry checker. */
+    auto dir_check = [](uint dnum, struct dirent *de, 
+            void *ctx) -> struct xv6_diter_action {
+        auto *check = (checker *) ctx;
+        xv6_diter_action ret = xv6_diter_action_init;
+        ret.cont = 1;
+        
+        if (de->inum != 0) {
+            check->warning("got %s\n", de->name);
+        }
+        return ret;
+    };
+    do {
+        uint addrs[NDIRECT + 1];
+        for (int i = 0; i <= NDIRECT; i++) {
+            addrs[i] = __le32_to_cpu(root.addrs[i]);
+        }
+        struct xv6_inode_ctx rc = {
+            .addrs = addrs,
+            .size = __le32_to_cpu(root.size),
+            .dirty = false,
+        };
+
+        if (xv6_dir_iterate(check, &rc, dir_check, check, false) != 0) {
+            check->error("%s iterating root directory failed.\n", check->err);
+            return 1;
+        }
+    } while (0);
 
     /* All check passed. */
     return 0;

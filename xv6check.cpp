@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -22,6 +23,15 @@ static void xv6_message(const char *fmt, ...) {
     va_start(va, fmt);
     vfprintf(stderr, fmt, va);
     va_end(va);
+}
+
+__attribute__((noreturn))
+static void panic(const char *fmt, ...) {
+    va_list va;
+    va_start(va, fmt);
+    vfprintf(stderr, fmt, va);
+    va_end(va);
+    abort();
 }
 
 static size_t fsize;
@@ -89,6 +99,7 @@ int main(int argc, char **argv) {
     check.bdata = checker_bdata;
     check.bread = checker_bread;
     check.brelse = checker_brelse;
+    check.panic = panic;
 
     return xv6_docheck(&check);
 }
