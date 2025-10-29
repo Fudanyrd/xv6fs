@@ -54,8 +54,9 @@ int xv6_inode_addr(struct checker *check, struct xv6_inode_ctx *inode,
         }
     }
     struct bufptr indir_buf(check->bread(sb, *indirno), check);
+    if (indir_buf.buf_ == nullptr) { return -EIO; }
     uint *data = reinterpret_cast<uint *>(indir_buf.data());
-    uint datano = data[i];
+    uint datano = __le32_to_cpu(data[i]);
     if (datano == 0) {
         if (!alloc) { return 0; }
         inode->dirty = true;
@@ -110,6 +111,10 @@ int xv6_dir_iterate(struct checker *check,
             }
         } else {
             struct bufptr debuf (check->bread(check->privat, blockno), check);
+            if (debuf.buf_ == nullptr) {
+                error = -EIO;
+                break;
+            }
             struct dirent *deptr = (struct dirent *) debuf.data();
             bool flush = false;
             for (uint k = off; k < lim; k++) {
@@ -138,6 +143,7 @@ int xv6_dir_iterate(struct checker *check,
         error = xv6_inode_addr(check, dir, size / nents, &blockno, alloc);
         if (error) { return error; }
         struct bufptr debuf (check->bread(check->privat, blockno), check);
+        if (debuf.buf_ == nullptr) { return -EIO; }
         struct dirent *deptr = (struct dirent *) debuf.data();
         deptr += size % nents;
         act = callback(size, deptr, ctx);
