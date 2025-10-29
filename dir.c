@@ -27,6 +27,25 @@ static inline int xv6_dget(struct inode *dir, struct dinode *dino) {
     return 0;
 }
 
+static struct xv6_diter_action de_find_callback(uint dnum, 
+            struct dirent *de, void *ctx) {
+    void **arr = ctx;
+    const char *target = (const void *) arr[0];
+    uint *dnumout = arr[1];
+    struct dirent *deout = arr[2];
+
+    struct xv6_diter_action next = xv6_diter_action_init;
+    next.cont = 1;
+    if (strncmp(target, de->name, DIRSIZ) == 0) {
+        next.cont = 0;
+        /* Copy out the results. */
+        *deout = *de;
+        *dnumout = dnum;
+    }
+
+    return next;
+}
+
 static int xv6_find_inum(struct inode *dir, const char *name, uint *dnum,
             struct dirent *dout) {
     if ((dir->i_mode & S_IFMT) != S_IFDIR) {
@@ -34,39 +53,25 @@ static int xv6_find_inum(struct inode *dir, const char *name, uint *dnum,
         return -ENOTDIR;
     }
 
-    const int nents = BSIZE / sizeof(struct dirent);
-    uint size = dir->i_size;
-    int error;
-    xv6_assert(size % sizeof(struct dirent) == 0 && "corrupted directory size");
-    size /= sizeof(struct dirent);
-    xv6_assert(size >= 2 && "directory must contain . and .. entries");
-    *dnum = 0;
-    struct buffer_head *bh = NULL;
-    uint block = 0;
-    while ((error = xv6_inode_block(dir, block, &bh)) == 0) {
-        if (bh == NULL) {
-            continue; /* This is a virtual zeroed block. */
-        }
-        const struct dirent *de = (const struct dirent *) bh->b_data;
-        const int lim = xv6_min(nents, size);
-        for (int i = 0; i < lim; i++) {
-            if (de[i].inum == 0) {
-                continue; /* unused entry */
-            }
-            if (strncmp(name, de[i].name, DIRSIZ) == 0) {
-                *dnum = block * nents + i;
-                memcpy(dout, &de[i], sizeof(*dout));
-                brelse(bh);
-                return 0;
-            }
-        }
-        brelse(bh);
-        block += 1;
-        size -= lim;
-        if (size == 0) {
-            break;
-        }
+    void *ctx[3];
+    ctx[0] = (void *) (uintptr_t) name;
+    ctx[1] = dnum; *dnum = 0;
+    ctx[2] = dout;
+
+    struct super_block *sb = dir->i_sb;
+    struct xv6_fs_info *fsinfo = sb->s_fs_info;
+    struct checker *check = &fsinfo->check;
+    struct dinode di;
+    struct xv6_inode_ctx ictx = xv6_inode_ctx_init(dir);
+
+    int error = xv6_init_ictx(&ictx, dir, &di);
+    if (unlikely(error)) {
+        return error;
     }
+
+    error = xv6_dir_iterate(check, &ictx, de_find_callback, 
+                (void **) ctx, 0, false);
+    xv6_assert (!ictx.dirty && "dirfind should not mut inode");
     return error;
 }
 
