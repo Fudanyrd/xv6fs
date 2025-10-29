@@ -256,42 +256,43 @@ static int xv6_dir_erase(struct inode *dir, const char *name) {
     return xv6_dentry_write(dir, dnum, NULL, 0);
 }
 
+static struct xv6_diter_action rmtest_callback(uint dnum, struct dirent *de, void *ctx) {
+    bool *empty = ctx;
+    struct xv6_diter_action act = xv6_diter_action_init;
+    act.cont = true;
+
+    if (dnum <= 1) {
+        return act;
+    }
+
+    if (de->inum != 0) {
+        xv6_assert (de->name[0] != 0 && "empty name in dir entry");
+        *empty = false;
+        act.cont = false;
+    }
+    return act;
+}
+
 /* Test whether this directory can be safely removed. */
 static int xv6_dir_rmtest(struct inode *dir) {
 
     bool ret = true;
-    const int nents = BSIZE / sizeof(struct dirent);
-    uint size = dir->i_size;
-    int error;
-    xv6_assert(size % sizeof(struct dirent) == 0 && "corrupted directory size");
-    size /= sizeof(struct dirent);
-    xv6_assert(size >= 2 && "directory must contain . and .. entries");
-    struct buffer_head *bh = NULL;
-    uint block = 0;
-    uint boff = 2; /* Should ignore . and .. */
-    while ((error = xv6_inode_block(dir, block, &bh)) == 0) {
-        if (bh == NULL) {
-            continue; /* This is a virtual zeroed block. */
-        }
-        const struct dirent *de = (const struct dirent *) bh->b_data;
-        const int lim = xv6_min(nents - boff, size);
-        for (int i = boff; i < lim; i++) {
-            if (de[i].inum == 0) {
-                continue; /* unused entry */
-            }
-            ret = false; break;
-        }
-        brelse(bh);
-        block += 1;
-        size -= lim;
-        boff = 0;
-        if (size == 0 || !ret) {
-            break;
-        }
+    struct super_block *sb = dir->i_sb;
+    struct xv6_fs_info *fsinfo = sb->s_fs_info;
+    struct checker *check = &fsinfo->check;
+    struct dinode di;
+    struct xv6_inode_ctx ictx = xv6_inode_ctx_init(dir);
+
+    int error = xv6_init_ictx(&ictx, dir, &di);
+    if (unlikely(error)) {
+        return error;
     }
 
+    /* Iterate the directory in read-only fashion. */
+    error = xv6_dir_iterate(check, &ictx, rmtest_callback,
+                &ret, 2 /* skip . and .. */, false);
+    xv6_assert (!ictx.dirty && "should not mut inode");
     if (error) {
-        /* oops, do not try to do anything instead. */
         return error;
     }
     return ret ? 0 : -ENOTEMPTY;
