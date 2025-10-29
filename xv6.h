@@ -186,8 +186,6 @@ static int xv6_unlink(struct inode *dir, struct dentry *entry);
 static int xv6_dir_erase(struct inode *dir, const char *name);
 
 static int xv6_rmdir(struct inode *dir, struct dentry *entry);
-static int xv6_dentry_write(struct inode *dir, uint dnum, const char *name, 
-            uint inum);
 /* 
  * +-+ file.c: file read/write operations. 
  * (directory is organized much like a file) 

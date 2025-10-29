@@ -46,6 +46,27 @@ static struct xv6_diter_action de_find_callback(uint dnum,
     return next;
 }
 
+static struct xv6_diter_action de_erase_callback(uint dnum, 
+            struct dirent *de, void *ctx) {
+    void **arr = ctx;
+    const char *target = (const void *) arr[0];
+    bool *success = arr[1];
+
+    struct xv6_diter_action next = xv6_diter_action_init;
+    next.cont = 1;
+    if (strncmp(target, de->name, DIRSIZ) == 0) {
+        next.cont = 0;
+        next.de_dirty = 1;
+        /* Copy out the results. */
+        *success = true;
+        memset(de, 0xfd, sizeof(*de));
+        de->inum = 0;
+        de->name[0] = 0;
+    }
+
+    return next;
+}
+
 static int xv6_find_inum(struct inode *dir, const char *name, uint *dnum,
             struct dirent *dout) {
     if ((dir->i_mode & S_IFMT) != S_IFDIR) {
@@ -212,22 +233,32 @@ static int xv6_dir_init(struct super_block *sb, uint block,
 }
 
 static int xv6_dir_erase(struct inode *dir, const char *name) {
-    uint size = dir->i_size;
-    int error;
-    xv6_assert(size % sizeof(struct dirent) == 0 && "corrupted directory size");
-    size /= sizeof(struct dirent);
-    xv6_assert(size >= 2 && "directory must contain . and .. entries");
+    if ((dir->i_mode & S_IFMT) != S_IFDIR) {
+        /* Not a directory. */
+        return -ENOTDIR;
+    }
 
-    uint dnum = 0;
-    struct dirent de;
-    error = xv6_find_inum(dir, name, &dnum, &de);
-    if (error) {
+    void *ctx[2];
+    bool success = false;
+    ctx[0] = (void *) (uintptr_t) name;
+    ctx[1] = &success;
+
+    struct super_block *sb = dir->i_sb;
+    struct xv6_fs_info *fsinfo = sb->s_fs_info;
+    struct checker *check = &fsinfo->check;
+    struct dinode di;
+    struct xv6_inode_ctx ictx = xv6_inode_ctx_init(dir);
+
+    int error = xv6_init_ictx(&ictx, dir, &di);
+    if (unlikely(error)) {
         return error;
     }
-    if (dnum == 0) {
-        return -ENOENT;
-    }
-    return xv6_dentry_write(dir, dnum, NULL, 0);
+
+    error = xv6_dir_iterate(check, &ictx, de_erase_callback, 
+                (void **) ctx, 2, false);
+    xv6_assert (!ictx.dirty && "dir erase should not mut inode");
+    return success ? error : -ENOENT;
+
 }
 
 static struct xv6_diter_action rmtest_callback(uint dnum, struct dirent *de, void *ctx) {
@@ -287,35 +318,6 @@ static int xv6_rmdir(struct inode *dir, struct dentry *entry) {
     }
 
     return xv6_unlink(dir, entry);
-}
-
-static int xv6_dentry_write(struct inode *dir, uint dnum, const char *name, 
-            uint inum) {
-    const uint ndents = BSIZE / sizeof(struct dirent);
-    struct buffer_head *bh;
-    int error = 0;
-
-    error = xv6_inode_wblock(dir, dnum / ndents, &bh); 
-    if (error) {
-        return error;
-    }
-
-    struct dirent *de = (struct dirent *) bh->b_data;
-    de += dnum % ndents;
-    if (name != NULL) {
-        memset(de->name, 0, DIRSIZ);
-        strncpy(de->name, name, DIRSIZ);
-        de->inum = __cpu_to_le16(inum);
-    } else {
-        /* Do clear action instead. */
-        memset(de, 0xfd, sizeof(*de));
-        de->inum = 0;
-        de->name[0] = 0;
-    }
-    mark_buffer_dirty(bh);
-    error = sync_dirty_buffer(bh);
-    brelse(bh);
-    return error;
 }
 
 static int xv6_init_ictx(struct xv6_inode_ctx *ictx, struct inode *inode, 
