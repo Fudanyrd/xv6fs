@@ -12,7 +12,7 @@ struct checker {
                      Don't ask me why I misspelled it 😭 */
     void *(* bread)(void *, uint); /**< Read a disk block, return the buffer struct. */
     void *(* bdata)(void *); /**< Given the buffer, get its internal data. */
-    void (*bfree)(void *); /**< Free an buffer. */
+    void (*brelse)(void *); /**< Release an buffer. */
 
     const char *warn; /**< Prefix of warning message. */
     void (*warning)(const char *fmt, ...);

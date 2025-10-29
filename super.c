@@ -86,7 +86,7 @@ static int xv6_fill_super(struct super_block *sb, struct fs_context *fc) {
     do {
         struct checker checker = {
             .bread = checker_bread,
-            .bfree = checker_bfree,
+            .brelse = checker_brelse,
             .bdata = checker_data,
             .warning = checker_printk,
             .error = checker_printk,

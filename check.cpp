@@ -26,7 +26,7 @@ struct bufptr {
 
     ~bufptr() {
         if (this->buf_)
-            ctx_->bfree(this->buf_);
+            ctx_->brelse(this->buf_);
     }
 
     void *data() {

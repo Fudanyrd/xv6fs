@@ -267,6 +267,6 @@ static void *checker_bread(void *privat, uint block);
 static void *checker_data(void *buffer);
 
 /* For checker::bfree */
-static void checker_bfree(void *buffer);
+static void checker_brelse(void *buffer);
 
 #endif /* _XV6_H 1 */

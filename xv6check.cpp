@@ -50,7 +50,7 @@ static void *checker_bdata(void *buf) {
     return buf;
 }
 
-static void checker_bfree(void *) {}
+static void checker_brelse(void *) {}
 
 int main(int argc, char **argv) {
     if (argc != 2) {
@@ -88,7 +88,7 @@ int main(int argc, char **argv) {
     check.warning  = check.error = xv6_message;
     check.bdata = checker_bdata;
     check.bread = checker_bread;
-    check.bfree = checker_bfree;
+    check.brelse = checker_brelse;
 
     return xv6_docheck(&check);
 }

@@ -66,7 +66,7 @@ static void *checker_data(void *buffer) {
     return bh->b_data;
 }
 
-static void checker_bfree(void *buffer) {
+static void checker_brelse(void *buffer) {
     struct buffer_head *bh = buffer;
     brelse(bh);
 }
