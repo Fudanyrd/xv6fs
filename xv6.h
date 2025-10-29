@@ -131,6 +131,7 @@ static int xv6_write_inode(struct inode *ino, struct writeback_control *wbc) {
 static void xv6_evict_inode(struct inode *ino);
 /*
  * Use the cached addresses in ino->i_private to accelerate `xv6_file_block`.
+ * When the block is not present, set bhptr to null and return 0.
  */
 static int xv6_inode_block(struct inode *ino, uint i,
             struct buffer_head **bhptr);

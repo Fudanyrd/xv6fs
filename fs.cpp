@@ -11,7 +11,7 @@
 int xv6_inode_addr(struct checker *check, struct xv6_inode_ctx *inode,
             uint i, uint *blockno, bool alloc) {
     *blockno = 0;
-    if (i > MAXFILE) {
+    if (i >= MAXFILE) {
         /* 
          * regardless whether we tries to allocate a block,
          * return an error. Otherwise, we'll get a buffer-overflow.
@@ -59,17 +59,16 @@ int xv6_inode_addr(struct checker *check, struct xv6_inode_ctx *inode,
     uint datano = __le32_to_cpu(data[i]);
     if (datano == 0) {
         if (!alloc) { return 0; }
-        inode->dirty = true;
         error = check->balloc(sb, &datano);
         if (error) { return error; }
         if (datano == 0) { return -ENOSPC; }
         data[i] = __cpu_to_le32(datano);
         /* Should mark buffer to dirty. */
-        (void) check->bflush(sb, indir_buf.buf_);
+        error = check->bflush(sb, indir_buf.buf_);
     }
 
     *blockno = datano;
-    return 0;
+    return error;
 }
 
 int xv6_dir_iterate(struct checker *check,

@@ -8,6 +8,7 @@
 #include "fs.h"
 #include "fsinfo.h"
 #include "xv6.h"
+#include "xv6c++.h"
 
 extern struct dentry *d_splice_alias(struct inode *inode, struct dentry *dentry);
 
@@ -305,146 +306,58 @@ static void xv6_evict_inode(struct inode *ino) {
 static int xv6_inode_block(struct inode *ino, uint i,
             struct buffer_head **bhptr) {
     struct super_block *sb = ino->i_sb;
-    uint *addrs;
-    struct dinode dino;
-    int error;
-    if (i >= MAXFILE) {
-        goto file_end;
-    }
-
-    /* Set `addrs` to start of indexing array.  */
-    if (unlikely(ino->i_private == NULL)) {
-        /* warn potential ENOMEM */
-        error = xv6_dget(ino, &dino);
-        if (error) { return error; }
-        for (int i = 0; i < NDIRECT + 1; i++) {
-            dino.addrs[i] = __le32_to_cpu(dino.addrs[i]);
-        }
-        addrs = dino.addrs;
-    } else {
-        addrs = ((struct xv6_inode_info *) ino->i_private)->addrs;
-    }
-
     *bhptr = NULL;
-    struct buffer_head *bh;
-    struct buffer_head *indirect = NULL;
-    if (i < NDIRECT) {
-        uint block = addrs[i];
-        if (block == 0) { goto file_end; }
-        bh = sb_bread(sb, block);
-        *bhptr = bh;
-        return bh ? 0 : -EIO;
-        /* FIXME: check block later */
+    struct xv6_fs_info *fsinfo = sb->s_fs_info;
+    struct dinode di;
+    struct xv6_inode_ctx ictx = xv6_inode_ctx_init(ino);
+    uint blockno = 0;
+    int error = xv6_init_ictx(&ictx, ino, &di);
+    if (error) {
+        return error;
     }
 
-    i -= NDIRECT;   
-    uint indirect_block = (addrs[NDIRECT]);
-    if (indirect_block == 0) { goto file_end; }
-
-    indirect = sb_bread(sb, indirect_block);
-    if (indirect == NULL) { 
-        return -EIO;
+    error = xv6_inode_addr(&fsinfo->check, &ictx, i, &blockno, false);
+    if (error) {
+        return error;
     }
-    const uint *iaddrs = (const uint *) indirect->b_data;
-    uint data_block = __le32_to_cpu(iaddrs[i]);
-    brelse(indirect);
-    if (data_block == 0) {
-        goto file_end;
+    if (blockno) {
+        *bhptr = sb_bread(sb, blockno);
+        error = *bhptr == NULL ? -EIO : 0;
     }
-
-    bh = sb_bread(sb, data_block);
-    *bhptr = bh;
-    return bh ? 0 : -EIO;
-file_end:
-    *bhptr = 0;
-    return 0;
+    xv6_assert(!ictx.dirty && "inode_addr should not mutate inode");
+    return error;
 }
 
 static int xv6_inode_wblock(struct inode *ino, uint i,
             struct buffer_head **bhptr) {
-    if (i >= MAXFILE) {
-        return -EFBIG;
+    struct super_block *sb = ino->i_sb;
+    *bhptr = NULL;
+    struct xv6_fs_info *fsinfo = sb->s_fs_info;
+    struct dinode di;
+    struct xv6_inode_ctx ictx = xv6_inode_ctx_init(ino);
+    uint blockno = 0;
+    int error = xv6_init_ictx(&ictx, ino, &di);
+    if (unlikely(error)) {
+        return error;
     }
 
-    uint *addrs;
-    struct dinode dino;
-    int error = 0;
-    bool dirty = false;
-    struct buffer_head *buf_indirect = NULL;
-    struct buffer_head *buf_data = NULL;
-    bool indirect_dirty = false;
-
-    /* Set `addrs` to start of indexing array.  */
-    if (unlikely(ino->i_private == NULL)) {
-        /* warn potential ENOMEM */
-        error = xv6_dget(ino, &dino);
-        if (error) { return error; }
-        for (int i = 0; i < NDIRECT + 1; i++) {
-            dino.addrs[i] = __le32_to_cpu(dino.addrs[i]);
-        }
-        addrs = dino.addrs;
+    error = xv6_inode_addr(&fsinfo->check, &ictx, i, &blockno, true);
+    if (error) {
+        return error;
+    }
+    if (likely(blockno)) {
+        *bhptr = sb_bread(sb, blockno);
+        error = *bhptr == NULL ? -EIO : 0;
     } else {
-        addrs = ((struct xv6_inode_info *) ino->i_private)->addrs;
+        error = -ENOSPC;
     }
-
-    if (i < NDIRECT) {
-        if (addrs[i] == 0) {
-            error = xv6_balloc(ino->i_sb, &addrs[i]);
-            if (error) { return error; }
-            if (addrs[i] == 0) { return -ENOSPC; }
-            dirty = true;
-        }
-        *bhptr = sb_bread(ino->i_sb, addrs[i]);
-        error = (*bhptr) ? 0 : -EIO;
-        goto wblock_clean;
-    }
-
-    if (addrs[NDIRECT] == 0) {
-        error = xv6_balloc_zero(ino->i_sb, &addrs[NDIRECT]);
-        if (error) { return error; }
-        if (addrs[NDIRECT] == 0) { return -ENOSPC; }
-        dirty = true;
-    }
-    buf_indirect = sb_bread(ino->i_sb, addrs[NDIRECT]);
-    if (!buf_indirect) {
-        error = -EIO;
-        goto wblock_clean_indir;
-    }
-    uint *iaddrs = (uint *) buf_indirect->b_data;
-    i -= NDIRECT;
-    if (iaddrs[i] == 0) {
-        error = xv6_balloc(ino->i_sb, &iaddrs[i]);
-        if (error) { goto wblock_clean_indir; }
-        if (iaddrs[i] == 0) {
-            error = -ENOSPC;
-            goto wblock_clean_indir;
-        }
-        indirect_dirty = true;
-    }
-    buf_data = sb_bread(ino->i_sb, iaddrs[i]);
-    *bhptr = buf_data;
-    error = buf_data ? 0 : -EIO;
-
-wblock_clean_indir:
-    if (likely(buf_indirect)) {
-        if (indirect_dirty)  {
-            mark_buffer_dirty(buf_indirect);
-            sync_dirty_buffer(buf_indirect);
-        }
-        brelse(buf_indirect);
-    }
-wblock_clean:
-    if (dirty) {
+    
+    if (ictx.dirty && !error) {
         mark_inode_dirty(ino);
         if (unlikely(ino->i_private == NULL)) {
-            /* write this inode to disk. */
-            xv6_assert(offsetof(struct xv6_inode_info, addrs) == 0);
-            ino->i_private = addrs;
-            /* sync method depends on i_private to work properly. */
+            ino->i_private = ictx.addrs;
             error = xv6_sync_inode(ino);
             ino->i_private = NULL;
-        } else {
-            /* rely on fsync write this inode to disk. */
         }
     }
     return error;
