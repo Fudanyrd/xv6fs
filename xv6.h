@@ -147,6 +147,9 @@ struct dentry *xv6_mkdir (struct mnt_idmap *mmap, struct inode *dir,
             struct dentry *dentry, umode_t mode);
 /* Free all data blocks and indirect block of file. */
 static int xv6_inode_clear(struct inode *inode);
+struct xv6_inode_ctx;
+static inline int xv6_ictx_dirty(struct inode *inode, 
+                struct xv6_inode_ctx *ictx);
 
 /* +-+ dir.c: directory entry operations. These will NOT hold lock. +-+ */
 /* Use dir->i_ino to load an on-disk inode. */

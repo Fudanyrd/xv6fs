@@ -352,13 +352,8 @@ static int xv6_inode_wblock(struct inode *ino, uint i,
         error = -ENOSPC;
     }
     
-    if (ictx.dirty && !error) {
-        mark_inode_dirty(ino);
-        if (unlikely(ino->i_private == NULL)) {
-            ino->i_private = ictx.addrs;
-            error = xv6_sync_inode(ino);
-            ino->i_private = NULL;
-        }
+    if (!error) {
+        error = xv6_ictx_dirty(ino, &ictx);
     }
     return error;
 }
@@ -496,6 +491,21 @@ static int xv6_inode_clear(struct inode *inode) {
         inode->i_private = NULL;
     } else {
         error = xv6_sync_inode(inode);
+    }
+    return error;
+}
+
+static inline int xv6_ictx_dirty(struct inode *inode, 
+                struct xv6_inode_ctx *ictx) {
+    int error = 0;
+    if (ictx->dirty) {
+        mark_inode_dirty(inode);
+        inode->i_size = ictx->size;
+        if (unlikely(inode->i_private == NULL)) {
+            inode->i_private = ictx->addrs;
+            error = xv6_sync_inode(inode);
+            inode->i_private = NULL;
+        }
     }
     return error;
 }

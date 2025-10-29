@@ -70,13 +70,27 @@ static int xv6_find_inum(struct inode *dir, const char *name, uint *dnum,
     return error;
 }
 
+static struct xv6_diter_action de_insert_callback(uint dnum, 
+            struct dirent *de, void *ctx) {
+    const struct dirent *nde = (const void *)ctx;
+    struct xv6_diter_action next = xv6_diter_action_init;
+    next.dir_dirty = next.dir_ext = 1;
+    if (de->inum == 0) {
+        xv6_assert (de->name[0] == 0 && "empty name found");
+        next.cont = 0;
+        memcpy(de, nde, sizeof(*de));
+        next.de_dirty = true;
+        return next;
+    }
+    next.cont = 1;
+    return next;
+}
+
 static int xv6_dentry_insert(struct inode *dir, const char *name, uint inum) {
-    const uint nents = BSIZE / sizeof(struct dirent);
     if ((dir->i_mode & S_IFMT) != S_IFDIR) {
         /* Not a directory. */
         return -ENOTDIR;
     }
-
     if (strlen(name) > DIRSIZ) {
         return -ENAMETOOLONG;
     }
@@ -85,71 +99,26 @@ static int xv6_dentry_insert(struct inode *dir, const char *name, uint inum) {
         return -EEXIST;
     }
 
-    uint dnum = 0;
-    uint size = dir->i_size;
-    uint block = 0;
-    struct buffer_head *bh = NULL;
-    int error;
-    xv6_assert(size % sizeof(struct dirent) == 0 && "corrupted directory size");
-    size /= sizeof(struct dirent);
-    xv6_assert(size >= 2 && "directory must contain . and .. entries");
+    struct dirent newde;
+    memset(&newde, 0, sizeof(newde));
+    strncpy(newde.name, name, DIRSIZ);
+    newde.inum = __cpu_to_le16(inum);
+    struct super_block *sb = dir->i_sb;
+    struct xv6_fs_info *fsinfo = sb->s_fs_info;
+    struct checker *check = &fsinfo->check;
+    struct dinode di;
+    struct xv6_inode_ctx ictx = xv6_inode_ctx_init(dir);
 
-    /* First try find an empty directory from 0 to size. */
-    while ((error = xv6_inode_wblock(dir, block, &bh)) == 0) {
-        if (unlikely(bh == NULL)) {
-            error = -EIO;
-            goto insert_fini;
-        }
-        const struct dirent *de = (const struct dirent *) bh->b_data;
-        const int lim = xv6_min(nents, size);
-        for (int i = 0; i < lim; i++) {
-            if (de[i].inum == 0) {
-                dnum = block * nents + i;
-                break; /* unused entry */
-            }
-        }
-        if (dnum != 0) { break; }
-        brelse(bh);
-        bh = NULL;
-        block += 1;
-        size -= lim;
-        if (size == 0) {
-            /* All entries have been checked. */
-            break;
-        }
+    int error = xv6_init_ictx(&ictx, dir, &di);
+    if (unlikely(error)) {
+        return error;
     }
-
-    if (dnum != 0) {
-        goto insert_found;
+    /* iterator will do synchronize for us. */
+    error = xv6_dir_iterate(check, &ictx, de_insert_callback, &newde,
+                0, true);
+    if (!error) {
+        error = xv6_ictx_dirty(dir, &ictx);
     }
-
-    /* Must extend the file, and mark dir dirty. */
-    size  = dir->i_size;
-    block = size / nents;
-    dnum  = size / sizeof(struct dirent);
-    dir->i_size = size + sizeof(struct dirent);
-    mark_inode_dirty(dir);
-    (void) xv6_sync_inode(dir);
-    error = xv6_inode_wblock(dir, block, &bh);
-    if (error) {
-        goto insert_fini;
-    }
-
-insert_found:
-    xv6_assert (bh != NULL);
-    /* Write the entry. Now dnum = the allocated entry. */
-    struct dirent *target = (struct dirent *) bh->b_data;
-    target += dnum % nents;
-    memset(target, 0, sizeof(*target));
-    strncpy(target->name, name, DIRSIZ);
-    target->inum = __cpu_to_le16((ushort) inum);
-
-    /* Sync buffer. */
-    mark_buffer_dirty(bh);
-    error = sync_dirty_buffer(bh);
-    brelse(bh);
-    bh = NULL;
-insert_fini:
     return error;
 }
 
