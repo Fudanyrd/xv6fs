@@ -58,10 +58,11 @@ static inline void xv6_iunlock_exclusive(struct inode *ino) {
  * @param block[out]: allocated data block.
  * @returns -ERR if error occurred.
  */
-static int xv6_balloc(struct super_block *sb, uint *block);
+static int xv6_balloc(void *sb, uint *block);
 /* call xv6_balloc, and initialize the block to zero. */
-static int (*xv6_balloc_zero)(struct super_block *sb, uint *block) 
-            = xv6_balloc;
+static inline int xv6_balloc_zero(struct super_block *sb, uint *block) {
+    return xv6_balloc(sb, block);
+}
 /**
  * Marks `block` as unused. `block` must be a data block.
  * @returns -ERR if error occurred.
@@ -256,6 +257,7 @@ static const struct super_operations xv6_super_ops;
 static void xv6_kill_block_super(struct super_block *sb);
 
 /* +-+ init.c +-+ */
+static const struct checker modcheck;
 
 /* For checker::warning and checker::error */
 static void checker_printk(const char *fmt, ...);
@@ -268,5 +270,8 @@ static void *checker_data(void *buffer);
 
 /* For checker::bfree */
 static void checker_brelse(void *buffer);
+
+/* Flush dirty block. */
+static int checker_bflush(void *privat, void *buf);
 
 #endif /* _XV6_H 1 */

@@ -150,7 +150,8 @@ end_balloc:
 }
 
 
-static int xv6_balloc(struct super_block *sb, uint *block) {
+static int xv6_balloc(void *privat, uint *block) {
+    struct super_block *sb = privat;
     mutex_lock(xv6_balloc_lock(sb));
     int error = xv6_balloc_unsafe(sb, block);
     mutex_unlock(xv6_balloc_lock(sb));

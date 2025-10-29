@@ -5,6 +5,8 @@
 #include <linux/mutex.h>
 #include <linux/vfs.h>
 
+#include "check.h"
+
 /*
  * Xv6 filesystem info struct are defined here.
  */
@@ -41,6 +43,7 @@ struct xv6_fs_info {
     u64 balloc_hint; /* block allocation hint */
     struct rb_root inode_tree; /* tree of active inodes */
     struct mutex itree_lock; /* lock for inode_tree */
+    struct checker check; /* A generic fs context checker. */
 };
 
 /* Used by struct inode::i_private. */

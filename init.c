@@ -20,9 +20,12 @@
 #include "fsinfo.h"
 
 #include "xv6.h"
+#include "xv6c++.h"
 #include "check.h"
 
 EXPORT_SYMBOL_GPL(xv6_docheck);
+EXPORT_SYMBOL_GPL(xv6_dir_iterate);
+EXPORT_SYMBOL_GPL(xv6_inode_addr);
 
 static struct kmem_cache *xv6_inode_cachep;
 
@@ -69,6 +72,12 @@ static void *checker_data(void *buffer) {
 static void checker_brelse(void *buffer) {
     struct buffer_head *bh = buffer;
     brelse(bh);
+}
+
+static int checker_bflush(void *privat, void *buf) {
+    struct buffer_head *bh = buf;
+    mark_buffer_dirty(bh);
+    return sync_dirty_buffer(bh);
 }
 
 static void xv6_init_once(void *pt) {

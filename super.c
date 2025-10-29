@@ -7,6 +7,21 @@
 #include "fsinfo.h"
 #include "xv6.h"
 
+/* A definition of in-kernel checker that everyone can use. */
+static const struct checker modcheck = {
+    .bread = checker_bread,
+    .brelse = checker_brelse,
+    .bdata = checker_data,
+    .balloc = xv6_balloc,
+    .bflush = checker_bflush,
+    .warning = checker_printk,
+    .error = checker_printk,
+    .privat = NULL, /* Set it to the superblock. */
+    .err = KERN_ERR "xv6: " "\033[01;31merror:\033[0;m",
+    .warn = KERN_WARNING "xv6: " "\033[01;35merror:\033[0;m",
+    .panic = panic,
+};
+
 static int xv6fs_init_fs_ctx(struct fs_context *fc) {
     fc->ops = &xv6fs_context_ops;
     void *buf = kzalloc(sizeof(struct xv6_mount_options), GFP_KERNEL);
@@ -84,18 +99,10 @@ static int xv6_fill_super(struct super_block *sb, struct fs_context *fc) {
      * or directory. 
      */
     do {
-        struct checker checker = {
-            .bread = checker_bread,
-            .brelse = checker_brelse,
-            .bdata = checker_data,
-            .warning = checker_printk,
-            .error = checker_printk,
-            .privat = sb,
-            .err = KERN_ERR "xv6: " "\033[01;31merror:\033[0;m",
-            .warn = KERN_WARNING "xv6: " "\033[01;35merror:\033[0;m",
-        };
+        fsinfo->check = modcheck;
+        fsinfo->check.privat = sb;
 
-        if (xv6_docheck(&checker) != 0) {
+        if (xv6_docheck(&fsinfo->check) != 0) {
             xv6_error("checker reported errors. abort");
             goto out_fail;
         }

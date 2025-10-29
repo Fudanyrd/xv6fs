@@ -31,6 +31,7 @@ CXXKFLAGS += -mno-mmx -mno-sse2 -mno-3dnow -mno-avx
 #  module: overflow in relocation type 10 val ffffffffc05fde4b
 #  module: `xv6fs' likely not compiled with -mcmodel=kernel [😭]
 CXXKFLAGS += -mcmodel=kernel
+CXXFLAGS += -fno-pie
 
 CXX = $(CROSS_COMPILE)g++
 
