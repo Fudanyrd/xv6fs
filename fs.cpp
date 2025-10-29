@@ -10,13 +10,17 @@
 
 int xv6_inode_addr(struct checker *check, struct xv6_inode_ctx *inode,
             uint i, uint *blockno, bool alloc) {
-    if (alloc && i > MAXFILE) {
+    *blockno = 0;
+    if (i > MAXFILE) {
+        /* 
+         * regardless whether we tries to allocate a block,
+         * return an error. Otherwise, we'll get a buffer-overflow.
+         */
         return -EFBIG;
     }
 
     int error = 0;
     uint *addrs = inode->addrs;
-    *blockno = 0;
     inode->dirty = false;
     void *sb = check->privat; /* superblock */
 
