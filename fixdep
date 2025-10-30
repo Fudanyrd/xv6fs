@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# just like script/basic/fixdep
+# usage: fixdep init.o .init.o.cmd .init.o.d
+
+prefix=$( echo $1 | sed -E "s/(.*)\.o/\1/" )
+cat $3 | sed  "s/$1/deps_$1/" >> $2
+# rm -f $3
+

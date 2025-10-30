@@ -21,4 +21,5 @@ mnt/
 check
 *.d
 .*.d
+.*.sh
 

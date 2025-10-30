@@ -8,6 +8,10 @@
 #  error "either include <errno.h> or <linux/fs.h>."
 #endif
 
+#if EFBIG != 27
+#  error "Did you include the correct <errno.h> ?"
+#endif
+
 int xv6_inode_addr(struct checker *check, struct xv6_inode_ctx *inode,
             uint i, uint *blockno, bool alloc) {
     *blockno = 0;
