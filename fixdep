@@ -4,5 +4,6 @@
 
 prefix=$( echo $1 | sed -E "s/(.*)\.o/\1/" )
 cat $3 | sed  "s/$1/deps_$1/" >> $2
-# rm -f $3
+rm -f $3 || true
+exit 0
 
