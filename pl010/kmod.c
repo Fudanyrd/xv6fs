@@ -213,18 +213,19 @@ static ssize_t pl010_read(struct file *file, char __user *addrspace,
     
     size_t nr = BUFSIZ;    
     nr = nr > count ? count : nr;
+    count = nr;
     int pt = 0;
     
     while (nr != 0) {
         char ch = uart_get_char();
         uart_put_char(ch);
-	if (ch == '\r') {
-	    ch = '\n';
-	    uart_put_char(ch);
-	}
+	    if (ch == '\r') {
+	        ch = '\n';
+	        uart_put_char(ch);
+	    }
         buf[pt++]  = ch;
+	    nr -= 1;
         if (ch == '\n') { break; }
-	nr -= 1;
     }
     
     *offset += count - nr;
@@ -250,6 +251,7 @@ static ssize_t pl010_write(struct file *file, const char __user *addrspace,
             uart_put_char(buf[i]);
         }
         nw += ncpy;
+	addrspace += ncpy;
     }
 
     *offset += nw;
