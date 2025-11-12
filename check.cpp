@@ -115,11 +115,11 @@ int xv6_docheck(struct checker *check) noexcept {
         void *sb_buf = check->bread(privat, 0);
         defer(check->brelse(sb_buf));
         onnull(sb_buf, check->bread);
-        sb = *(struct superblock *) sb_buf;
+        sb = *(struct superblock *) (check->bdata(sb_buf));
     } while (0);
     const uint magic = xuint(sb.magic);
     if (FSMAGIC != magic) {
-        check->error("%s Incorrect magic number %x\n", check->err, magic);
+        check->error("%s Incorrect magic number 0x%x(0x%x)\n", check->err, magic, sb.magic);
         return 1;
     }
 
