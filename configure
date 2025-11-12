@@ -58,7 +58,7 @@ done
 
 # rest of the script.
 /usr/bin/env printf '\t%s  \x5c\n' $CXXFLAGS >> $script
-/usr/bin/env printf '\t-std=c++11 -c -o %s %s \x5c\n' "$prefix.o" "$prefix.cpp" >> $script
+/usr/bin/env printf '\t-std=gnu++11 -c -o %s %s \x5c\n' "$prefix.o" "$prefix.cpp" >> $script
 /usr/bin/env printf '\t%s %s %s\n' "-MD" "-MF" $dep >> $script
 # rest of the .cmd (TODO)
 echo ' ' $CXXFLAGS '-std=c++11' -c -o "$prefix.o" "$prefix.cpp" '-MD' '-MF' $dep >> $cmd

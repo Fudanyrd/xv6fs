@@ -1,5 +1,6 @@
 #include "xv6c++.h"
 #include "check.h"
+#include "defer.h"
 
 struct xv6_checker_info {
     uint logstart;
@@ -111,9 +112,10 @@ int xv6_docheck(struct checker *check) noexcept {
     struct superblock sb;
     void *const privat = check->privat;
     do {
-        struct bufptr sbptr(check->bread(privat, 0), check);
-        onnull(sbptr.buf_, check->bread);
-        sb = *(struct superblock *) sbptr.data();
+        void *sb_buf = check->bread(privat, 0);
+        defer(check->brelse(sb_buf));
+        onnull(sb_buf, check->bread);
+        sb = *(struct superblock *) sb_buf;
     } while (0);
     const uint magic = xuint(sb.magic);
     if (FSMAGIC != magic) {
