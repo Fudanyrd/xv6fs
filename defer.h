@@ -18,5 +18,28 @@
   CONCAT(__defer, __LINE__)                                                    \
   CONCAT(__defer_instance, __LINE__)(CONCAT(__defer_wrapper_, __LINE__))
 
-#endif /* _DEFER_H_ 1 */
+#if __cplusplus >= 201700L
 
+#undef defer
+
+template <typename _Tp> class __defer_call {
+public:
+  __defer_call(_Tp &callable) : _M_fn_(&callable) {}
+
+  ~__defer_call() { (*_M_fn_)(); }
+
+  __defer_call(const __defer_call &other) = delete;
+  __defer_call &operator=(const __defer_call &other) = delete;
+
+private:
+  _Tp *_M_fn_;
+};
+
+#define defer(statement)                                                       \
+  auto CONCAT(__defer_wrapper_, __LINE__) = [&](void) { statement; };          \
+  auto CONCAT(__defer_instance, __LINE__) =                                    \
+      __defer_call(CONCAT(__defer_wrapper_, __LINE__))
+
+#endif
+
+#endif /* _DEFER_H_ 1 */
